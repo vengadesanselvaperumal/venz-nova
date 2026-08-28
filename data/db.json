@@ -1,0 +1,163 @@
+{
+  "users": [
+    {
+      "id": "usr_55b077d9f0ab2b",
+      "fullName": "VENZNOVA Demo Student",
+      "rollNumber": "DEMO/BFTECH/001",
+      "email": "demo@venz-nova.local",
+      "graduationYear": "2027",
+      "programme": "BFTech",
+      "status": "Student",
+      "joinAs": "Student",
+      "skills": "AI, Fashion Technology, Python, Forecasting",
+      "linkedin": "",
+      "portfolio": "",
+      "bio": "Demo profile showing how a BFTech student can combine technology and fashion.",
+      "profilePicture": "",
+      "passwordHash": "cb47cb33abfcd8e22f8d6515f839917e:5e4a6f0e193edd95587eb915119f22e69d0ad4adbdf8e30ecb47c27aac44da00408b2f1408a6a49c12fdf85b36ff97e1d0cd1866648dc3e18978a83c4b2f7bf2",
+      "sessionToken": "",
+      "createdAt": "2026-08-28T01:23:12.817Z"
+    },
+    {
+      "id": "usr_042ae02fd5a335",
+      "fullName": "Vengadesan Selvaperumal",
+      "rollNumber": "BFD/23/898",
+      "email": "vengadesan181005@gmail.com",
+      "graduationYear": "2027",
+      "programme": "BFTech",
+      "status": "Student",
+      "joinAs": "Student",
+      "skills": "",
+      "linkedin": "",
+      "portfolio": "",
+      "bio": "",
+      "profilePicture": "",
+      "passwordHash": "b6b2363906e53e5ac29d709342e720af:6297d637c9e4a5936f4802b2b5a754acabf57f1f922d82f8decce96153d21c0c2e39cf20dba3d0d4b11296a979320b502651a16304296d3f389bc465e2579373",
+      "sessionToken": "95a5584ebc98082dd16d7690a43a9b2ec6bd7a859d89b04e8a71cea67b64e915",
+      "createdAt": "2026-08-28T01:43:57.931Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "prj_948bfd66dbf212",
+      "userId": "usr_55b077d9f0ab2b",
+      "title": "AI Fashion Demand Forecasting",
+      "description": "A BFTech concept that uses historical sales and fashion attributes to forecast product demand and support better decisions.",
+      "category": "AI / Data",
+      "skills": "Python, Forecasting, Fashion, Data Analytics",
+      "visibility": "public",
+      "file": null,
+      "likes": [],
+      "createdAt": "2026-08-28T01:23:12.817Z"
+    }
+  ],
+  "doubts": [
+    {
+      "id": "doubt_34456fbd200419",
+      "userId": "usr_55b077d9f0ab2b",
+      "title": "How can I combine fashion and AI in a BFTech project?",
+      "description": "Looking for ideas that connect fashion technology with forecasting, prediction or data analytics.",
+      "category": "Career",
+      "createdAt": "2026-08-28T01:23:12.817Z"
+    }
+  ],
+  "answers": [],
+  "opportunities": [
+    {
+      "id": "opp_1efd76f8e611a0",
+      "userId": "usr_55b077d9f0ab2b",
+      "title": "Fashion Technology Intern — AI & Analytics",
+      "description": "Demo opportunity for students interested in fashion data, forecasting, Python and technology.",
+      "type": "Internship",
+      "location": "Remote / India",
+      "skills": "Python, AI, Fashion, Analytics",
+      "deadline": "",
+      "createdAt": "2026-08-28T01:23:12.817Z"
+    }
+  ],
+  "applications": [],
+  "connections": [],
+  "messages": [],
+  "notifications": [
+    {
+      "id": "ntf_e4d241a7bde5e5",
+      "userId": "usr_55b077d9f0ab2b",
+      "type": "assignment",
+      "text": "Vengadesan Selvaperumal accepted your assignment: Create a fashion trend forecasting report. Advance payment is now due.",
+      "createdAt": "2026-08-28T01:44:08.685Z",
+      "read": false
+    }
+  ],
+  "assignments": [
+    {
+      "id": "asgn_demo001",
+      "userId": "usr_55b077d9f0ab2b",
+      "title": "Create a fashion trend forecasting report",
+      "description": "Analyse fashion trend data and prepare a concise forecasting report with charts, insights and recommendations. This demo brief shows the paid assignment workflow.",
+      "category": "AI / Data",
+      "skills": "Forecasting, Python, Fashion Analytics, Excel",
+      "budget": 12000,
+      "advancePercent": 30,
+      "deadline": "2026-09-20",
+      "assignmentFile": null,
+      "status": "accepted",
+      "workerId": "usr_042ae02fd5a335",
+      "acceptedAt": "2026-08-28T01:44:08.684Z",
+      "advancePaid": false,
+      "advancePaidAt": null,
+      "submittedAt": null,
+      "finalApprovedAt": null,
+      "finalPaid": false,
+      "finalPaidAt": null,
+      "reworksAllowed": 3,
+      "reworksUsed": 0,
+      "reworkFeedback": [],
+      "history": [
+        {
+          "type": "posted",
+          "userId": "usr_55b077d9f0ab2b",
+          "createdAt": "2026-08-28T01:30:00.000Z"
+        },
+        {
+          "type": "accepted",
+          "userId": "usr_042ae02fd5a335",
+          "createdAt": "2026-08-28T01:44:08.684Z"
+        }
+      ],
+      "createdAt": "2026-08-28T01:30:00.000Z"
+    },
+    {
+      "id": "asgn_6386184e8dd335",
+      "userId": "usr_042ae02fd5a335",
+      "title": "hjghj",
+      "description": "hcj",
+      "category": "Fashion / Design",
+      "skills": "",
+      "budget": 150,
+      "advancePercent": 22,
+      "deadline": "",
+      "assignmentFile": null,
+      "status": "open",
+      "workerId": null,
+      "acceptedAt": null,
+      "advancePaid": false,
+      "advancePaidAt": null,
+      "submittedAt": null,
+      "finalApprovedAt": null,
+      "finalPaid": false,
+      "finalPaidAt": null,
+      "reworksAllowed": 3,
+      "reworksUsed": 0,
+      "reworkFeedback": [],
+      "history": [
+        {
+          "type": "posted",
+          "userId": "usr_042ae02fd5a335",
+          "createdAt": "2026-08-28T09:43:37.121Z"
+        }
+      ],
+      "createdAt": "2026-08-28T09:43:37.121Z"
+    }
+  ],
+  "payments": []
+}
