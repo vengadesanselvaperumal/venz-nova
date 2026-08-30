@@ -1,241 +1,173 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { createClient } = require("@supabase/supabase-js");
 const crypto = require("crypto");
 const { URL } = require("url");
 
+require("dotenv").config({
+  path: require("path").join(__dirname, ".env")
+});
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
-const DATA = path.join(ROOT, "data");
-const UP = path.join(ROOT, "uploads");
+const UPLOADS = path.join(ROOT, "uploads");
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 
-fs.mkdirSync(DATA, { recursive: true });
-fs.mkdirSync(UP, { recursive: true });
+fs.mkdirSync(UPLOADS, { recursive: true });
 
-const DB = path.join(DATA, "db.json");
+/*
+========================================================
+SUPABASE CONFIGURATION
+Supports both old and new Supabase key names
+========================================================
+*/
 
-const EMPTY = {
-  users: [],
-  projects: [],
-  doubts: [],
-  answers: [],
-  opportunities: [],
-  applications: [],
-  assignments: [],
-  connections: [],
-  messages: [],
-  notifications: [],
-  payments: []
-};
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-if (!fs.existsSync(DB)) {
-  fs.writeFileSync(DB, JSON.stringify(EMPTY, null, 2));
-}
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/* =========================================================
-   DATABASE
-========================================================= */
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY;
 
-function db() {
-  try {
-    const data = JSON.parse(fs.readFileSync(DB, "utf8"));
+/*
+========================================================
+SAFE ENV CHECK
+Does NOT print your actual secret keys
+========================================================
+*/
 
-    for (const key of Object.keys(EMPTY)) {
-      if (!Array.isArray(data[key])) {
-        data[key] = [];
-      }
-    }
+console.log("");
+console.log("==========================================");
+console.log("VENZNOVA SUPABASE ENV CHECK");
+console.log("==========================================");
+console.log(
+  "SUPABASE_URL:",
+  SUPABASE_URL ? "LOADED" : "MISSING"
+);
+console.log(
+  "SUPABASE_ANON_KEY:",
+  SUPABASE_ANON_KEY ? "LOADED" : "MISSING"
+);
+console.log(
+  "SUPABASE_SERVICE_ROLE_KEY:",
+  SUPABASE_SERVICE_ROLE_KEY ? "LOADED" : "MISSING"
+);
+console.log("==========================================");
+console.log("");
 
-    return data;
-  } catch (err) {
-    console.error("Database read error:", err);
-
-    fs.writeFileSync(DB, JSON.stringify(EMPTY, null, 2));
-
-    return JSON.parse(JSON.stringify(EMPTY));
-  }
-}
-
-function save(data) {
-  fs.writeFileSync(DB, JSON.stringify(data, null, 2));
-}
-
-const id = (prefix) =>
-  prefix + "_" + crypto.randomBytes(7).toString("hex");
-
-const now = () => new Date().toISOString();
-
-const tok = () =>
-  crypto.randomBytes(32).toString("hex");
-
-/* =========================================================
-   PASSWORD
-========================================================= */
-
-function hash(password, salt = crypto.randomBytes(16).toString("hex")) {
-  return (
-    salt +
-    ":" +
-    crypto.scryptSync(password, salt, 64).toString("hex")
+if (
+  !SUPABASE_URL ||
+  !SUPABASE_ANON_KEY ||
+  !SUPABASE_SERVICE_ROLE_KEY
+) {
+  console.error("SUPABASE CONFIGURATION FAILED.");
+  console.error("");
+  console.error("Your .env must contain:");
+  console.error("SUPABASE_URL=...");
+  console.error("SUPABASE_ANON_KEY=...");
+  console.error("SUPABASE_SERVICE_ROLE_KEY=...");
+  console.error("");
+  console.error(
+    "OR the newer names:"
   );
+  console.error("SUPABASE_PUBLISHABLE_KEY=...");
+  console.error("SUPABASE_SECRET_KEY=...");
+  console.error("");
+  process.exit(1);
 }
 
-function verify(password, stored) {
-  try {
-    const [salt, key] = String(stored).split(":");
+/*
+========================================================
+SUPABASE CLIENTS
+========================================================
+*/
 
-    if (!salt || !key) return false;
-
-    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-
-    return crypto.timingSafeEqual(
-      Buffer.from(key, "hex"),
-      Buffer.from(derived, "hex")
-    );
-  } catch {
-    return false;
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   }
-}
+);
 
+const authClient = createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 /* =========================================================
-   SEED DEMO DATA
+   BASIC HELPERS
 ========================================================= */
 
-function seed() {
-  const d = db();
-
-  if (d.users.length) return;
-
-  const u = {
-    id: id("usr"),
-    fullName: "VENZNOVA Demo Student",
-    rollNumber: "DEMO/BFTECH/001",
-    email: "demo@venz-nova.local",
-    graduationYear: "2027",
-    programme: "BFTech",
-    status: "Student",
-    joinAs: "Student",
-    skills: "AI, Fashion Technology, Python, Forecasting",
-    linkedin: "",
-    portfolio: "",
-    bio:
-      "Demo profile showing how a BFTech student can combine technology and fashion.",
-    profilePicture: "",
-    passwordHash: hash("Demo1234"),
-    sessionToken: "",
-    createdAt: now()
-  };
-
-  d.users.push(u);
-
-  d.projects.push({
-    id: id("prj"),
-    userId: u.id,
-    title: "AI Fashion Demand Forecasting",
-    description:
-      "A BFTech concept that uses historical sales and fashion attributes to forecast product demand and support better decisions.",
-    category: "AI / Data",
-    skills: "Python, Forecasting, Fashion, Data Analytics",
-    visibility: "public",
-    file: null,
-    likes: [],
-    createdAt: now()
-  });
-
-  d.doubts.push({
-    id: id("doubt"),
-    userId: u.id,
-    title: "How can I combine fashion and AI in a BFTech project?",
-    description:
-      "Looking for ideas that connect fashion technology with forecasting, prediction or data analytics.",
-    category: "Career",
-    createdAt: now()
-  });
-
-  d.opportunities.push({
-    id: id("opp"),
-    userId: u.id,
-    title: "Fashion Technology Intern — AI & Analytics",
-    description:
-      "Demo opportunity for students interested in fashion data, forecasting, Python and technology.",
-    type: "Internship",
-    location: "Remote / India",
-    skills: "Python, AI, Fashion, Analytics",
-    deadline: "",
-    createdAt: now()
-  });
-
-  save(d);
+function now() {
+  return new Date().toISOString();
 }
 
-seed();
-
-/* =========================================================
-   PUBLIC USER
-========================================================= */
-
-function safe(user) {
-  if (!user) return null;
-
-  const x = { ...user };
-
-  delete x.passwordHash;
-  delete x.sessionToken;
-
-  return x;
-}
-
-/* =========================================================
-   RESPONSE
-========================================================= */
-
-function send(res, status, data, type = "application/json") {
-  const body =
-    type === "application/json"
-      ? JSON.stringify(data)
-      : data;
-
+function json(res, status, data) {
   res.writeHead(status, {
-    "Content-Type": type,
+    "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers":
       "Content-Type, Authorization",
     "Access-Control-Allow-Methods":
       "GET, POST, PUT, PATCH, DELETE, OPTIONS"
   });
 
+  res.end(JSON.stringify(data));
+}
+
+function text(
+  res,
+  status,
+  body,
+  type = "text/plain; charset=utf-8"
+) {
+  res.writeHead(status, {
+    "Content-Type": type,
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*"
+  });
+
   res.end(body);
 }
 
-/* =========================================================
-   BODY
-========================================================= */
-
 function parseBody(req) {
   return new Promise((resolve, reject) => {
-    let body = "";
+    let raw = "";
 
-    req.on("data", (chunk) => {
-      body += chunk;
+    req.on("data", chunk => {
+      raw += chunk;
 
-      if (body.length > 25 * 1024 * 1024) {
-        req.destroy();
+      if (raw.length > 30 * 1024 * 1024) {
         reject(new Error("Request too large"));
+        req.destroy();
       }
     });
 
     req.on("end", () => {
-      if (!body) {
+      if (!raw) {
         resolve({});
         return;
       }
 
       try {
-        resolve(JSON.parse(body));
+        resolve(JSON.parse(raw));
       } catch {
         reject(new Error("Invalid JSON"));
       }
@@ -246,220 +178,313 @@ function parseBody(req) {
 }
 
 /* =========================================================
-   COOKIE HELPERS
+   PROFILE NORMALIZATION
 ========================================================= */
 
-function getCookies(req) {
-  const header = req.headers.cookie || "";
+/*
+  IMPORTANT FIX
 
-  const cookies = {};
+  Your index.html uses camelCase fields:
 
-  header.split(";").forEach((part) => {
-    const index = part.indexOf("=");
+  fullName
+  rollNumber
+  graduationYear
+  admissionYear
+  joinAs
 
-    if (index === -1) return;
+  Supabase normally stores:
 
-    const key = part.slice(0, index).trim();
-    const value = part.slice(index + 1).trim();
+  name
+  roll_number
+  graduation_year
+  admission_year
+  join_as
 
-    if (key) {
-      cookies[key] = decodeURIComponent(value);
-    }
-  });
+  This function gives the frontend BOTH formats.
+*/
 
-  return cookies;
-}
+function safeProfile(profile, authUser = null) {
+  const p = profile || {};
+  const metadata = authUser?.user_metadata || {};
 
-function setSessionCookie(res, token) {
-  const isProduction =
-    process.env.NODE_ENV === "production";
+  const email =
+    p.email ||
+    authUser?.email ||
+    metadata.email ||
+    "";
 
-  const cookie =
-    "vn_token=" +
-    encodeURIComponent(token) +
-    "; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000" +
-    (isProduction ? "; Secure" : "");
+  const fullName =
+    p.fullName ||
+    p.full_name ||
+    p.name ||
+    metadata.fullName ||
+    metadata.full_name ||
+    metadata.name ||
+    email.split("@")[0] ||
+    "User";
 
-  res.setHeader("Set-Cookie", cookie);
-}
+  const rollNumber =
+    p.rollNumber ||
+    p.roll_number ||
+    metadata.rollNumber ||
+    metadata.roll_number ||
+    "";
 
-function clearSessionCookie(res) {
-  res.setHeader(
-    "Set-Cookie",
-    "vn_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" +
-      (process.env.NODE_ENV === "production"
-        ? "; Secure"
-        : "")
-  );
+  const graduationYear =
+    p.graduationYear ??
+    p.graduation_year ??
+    metadata.graduationYear ??
+    metadata.graduation_year ??
+    "";
+
+  const admissionYear =
+    p.admissionYear ??
+    p.admission_year ??
+    metadata.admissionYear ??
+    metadata.admission_year ??
+    "";
+
+  const programme =
+    p.programme ||
+    metadata.programme ||
+    "BFTech";
+
+  const status =
+    p.status ||
+    metadata.status ||
+    "Student";
+
+  const joinAs =
+    p.joinAs ||
+    p.join_as ||
+    metadata.joinAs ||
+    metadata.join_as ||
+    "Student";
+
+  const role =
+    p.role ||
+    metadata.role ||
+    String(joinAs).toUpperCase();
+
+  const bio =
+    p.bio ||
+    metadata.bio ||
+    "";
+
+  const skills =
+    p.skills ||
+    metadata.skills ||
+    "";
+
+  const campus =
+    p.campus ||
+    metadata.campus ||
+    "";
+
+  const linkedin =
+    p.linkedin ||
+    metadata.linkedin ||
+    "";
+
+  const portfolio =
+    p.portfolio ||
+    metadata.portfolio ||
+    "";
+
+  const photoUrl =
+    p.photoUrl ||
+    p.photo_url ||
+    metadata.photoUrl ||
+    metadata.photo_url ||
+    "";
+
+  return {
+    ...p,
+
+    id:
+      p.id ||
+      authUser?.id ||
+      metadata.sub ||
+      "",
+
+    name: fullName,
+    fullName: fullName,
+    full_name: fullName,
+
+    email: email,
+
+    rollNumber: rollNumber,
+    roll_number: rollNumber,
+
+    admissionYear: admissionYear,
+    admission_year: admissionYear,
+
+    graduationYear: graduationYear,
+    graduation_year: graduationYear,
+
+    programme: programme,
+
+    status: status,
+
+    joinAs: joinAs,
+    join_as: joinAs,
+
+    role: role,
+
+    campus: campus,
+
+    linkedin: linkedin,
+
+    portfolio: portfolio,
+
+    bio: bio,
+
+    skills: skills,
+
+    photoUrl: photoUrl,
+    photo_url: photoUrl
+  };
 }
 
 /* =========================================================
    AUTHENTICATION
 ========================================================= */
 
-function auth(req) {
-  const d = db();
+async function currentUser(req) {
+  try {
+    const header =
+      req.headers.authorization || "";
 
-  /*
-    1. First check Authorization header.
+    if (!header.startsWith("Bearer ")) {
+      return null;
+    }
 
-    Expected:
-    Authorization: Bearer abc123
-  */
+    const token =
+      header.slice(7).trim();
 
-  const authorization =
-    req.headers.authorization || "";
+    if (!token) {
+      return null;
+    }
 
-  let token = "";
+    const {
+      data,
+      error
+    } = await authClient.auth.getUser(token);
 
-  if (
-    authorization &&
-    authorization.toLowerCase().startsWith("bearer ")
-  ) {
-    token = authorization.slice(7).trim();
-  }
+    if (error) {
+      console.error(
+        "Supabase getUser error:",
+        error.message
+      );
 
-  /*
-    2. If Authorization is missing, check cookie.
+      return null;
+    }
 
-    This is important for Render/browser navigation.
-  */
+    if (!data?.user) {
+      return null;
+    }
 
-  if (!token) {
-    const cookies = getCookies(req);
+    return data.user;
+  } catch (error) {
+    console.error(
+      "currentUser error:",
+      error.message
+    );
 
-    token = cookies.vn_token || "";
-  }
-
-  if (!token) {
     return null;
   }
+}
 
-  return (
-    d.users.find(
-      (user) =>
-        user.sessionToken &&
-        user.sessionToken === token
-    ) || null
-  );
+function requireUser(user, res) {
+  if (!user) {
+    json(res, 401, {
+      error: "Login required"
+    });
+
+    return false;
+  }
+
+  return true;
 }
 
 /* =========================================================
-   PUBLIC OBJECTS
+   PROFILE DATABASE
 ========================================================= */
 
-function pubProject(project, data) {
-  return {
-    ...project,
-    creator: safe(
-      data.users.find(
-        (user) => user.id === project.userId
-      )
-    )
-  };
-}
-
-function pubDoubt(doubt, data) {
-  return {
-    ...doubt,
-
-    creator: safe(
-      data.users.find(
-        (user) => user.id === doubt.userId
-      )
-    ),
-
-    answers: data.answers
-      .filter(
-        (answer) =>
-          answer.doubtId === doubt.id
-      )
-      .map((answer) => ({
-        ...answer,
-
-        creator: safe(
-          data.users.find(
-            (user) =>
-              user.id === answer.userId
-          )
-        )
-      }))
-  };
-}
-
-function pubOpp(opportunity, data) {
-  return {
-    ...opportunity,
-
-    creator: safe(
-      data.users.find(
-        (user) =>
-          user.id === opportunity.userId
-      )
-    )
-  };
-}
-
-function pubAssignment(assignment, data) {
-  return {
-    ...assignment,
-
-    poster: safe(
-      data.users.find(
-        (user) =>
-          user.id === assignment.userId
-      )
-    ),
-
-    worker: assignment.workerId
-      ? safe(
-          data.users.find(
-            (user) =>
-              user.id === assignment.workerId
-          )
-        )
-      : null,
-
-    history: (assignment.history || []).map(
-      (history) => ({
-        ...history,
-
-        by: safe(
-          data.users.find(
-            (user) =>
-              user.id === history.userId
-          )
-        )
-      })
-    )
-  };
-}
-
-/* =========================================================
-   DATABASE SCHEMA
-========================================================= */
-
-function ensureSchema() {
-  const data = db();
-
-  let changed = false;
-
-  for (const key of [
-    "assignments",
-    "payments"
-  ]) {
-    if (!Array.isArray(data[key])) {
-      data[key] = [];
-      changed = true;
+async function getProfile(id) {
+  try {
+    if (!id) {
+      return null;
     }
-  }
 
-  if (changed) {
-    save(data);
+    const {
+      data,
+      error
+    } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "getProfile error:",
+        error.message
+      );
+
+      return null;
+    }
+
+    return data || null;
+  } catch (error) {
+    console.error(
+      "getProfile exception:",
+      error.message
+    );
+
+    return null;
   }
 }
 
-ensureSchema();
+async function getProfiles(ids) {
+  const unique = [
+    ...new Set(
+      (ids || []).filter(Boolean)
+    )
+  ];
+
+  if (!unique.length) {
+    return new Map();
+  }
+
+  try {
+    const {
+      data,
+      error
+    } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", unique);
+
+    if (error) {
+      console.error(
+        "getProfiles error:",
+        error.message
+      );
+
+      return new Map();
+    }
+
+    return new Map(
+      (data || []).map(x => [
+        x.id,
+        x
+      ])
+    );
+  } catch {
+    return new Map();
+  }
+}
 
 /* =========================================================
    FILE UPLOAD
@@ -470,25 +495,31 @@ function fileFromData(data) {
     return null;
   }
 
-  const match = String(data.data).match(
-    /^data:([^;]+);base64,(.+)$/
-  );
+  const match =
+    String(data.data).match(
+      /^data:([^;]+);base64,(.+)$/
+    );
 
   if (!match) {
-    throw new Error("Invalid uploaded file");
+    throw new Error(
+      "Invalid uploaded file"
+    );
   }
 
-  const mimeType = match[1];
+  const mime = match[1];
   const base64 = match[2];
 
-  const extensions = {
+  const extMap = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
     "image/gif": ".gif",
 
     "application/pdf": ".pdf",
+
     "application/zip": ".zip",
+    "application/x-zip-compressed":
+      ".zip",
 
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
       ".docx",
@@ -500,33 +531,157 @@ function fileFromData(data) {
       ".pptx",
 
     "application/vnd.ms-powerpoint":
-      ".ppt"
+      ".ppt",
+
+    "text/plain": ".txt"
   };
 
-  const extension =
-    extensions[mimeType] ||
-    path.extname(data.name || "").toLowerCase() ||
+  const ext =
+    extMap[mime] ||
+    path.extname(
+      data.name || ""
+    ).toLowerCase() ||
     ".bin";
 
   const filename =
-    Date.now() +
-    "-" +
-    crypto.randomBytes(5).toString("hex") +
-    extension;
+    `${Date.now()}-` +
+    `${crypto.randomBytes(6).toString("hex")}` +
+    ext;
+
+  const filepath =
+    path.join(
+      UPLOADS,
+      filename
+    );
 
   fs.writeFileSync(
-    path.join(UP, filename),
-    Buffer.from(base64, "base64")
+    filepath,
+    Buffer.from(
+      base64,
+      "base64"
+    )
   );
 
   return {
-    name: data.name || filename,
-    url: "/uploads/" + filename,
-    size: Buffer.byteLength(
-      base64,
-      "base64"
-    ),
-    type: mimeType
+    name:
+      data.name ||
+      filename,
+
+    url:
+      `/uploads/${filename}`,
+
+    size:
+      Buffer.byteLength(
+        base64,
+        "base64"
+      ),
+
+    type:
+      mime
+  };
+}
+
+/* =========================================================
+   PUBLIC OBJECT HELPERS
+========================================================= */
+
+function publicProject(
+  project,
+  creator
+) {
+  return {
+    ...project,
+
+    creator:
+      safeProfile(creator),
+
+    file:
+      project.file_url
+        ? {
+            url:
+              project.file_url,
+
+            name:
+              project.file_name
+          }
+        : null
+  };
+}
+
+function publicDoubt(
+  doubt,
+  creator,
+  answers = []
+) {
+  return {
+    ...doubt,
+
+    creator:
+      safeProfile(creator),
+
+    answers:
+      answers.map(a => ({
+        ...a,
+
+        creator:
+          safeProfile(
+            a.creator
+          )
+      }))
+  };
+}
+
+function publicOpportunity(
+  opportunity,
+  creator
+) {
+  return {
+    ...opportunity,
+
+    creator:
+      safeProfile(creator)
+  };
+}
+
+function publicAssignment(
+  assignment,
+  poster,
+  worker,
+  reworks = []
+) {
+  return {
+    ...assignment,
+
+    poster:
+      safeProfile(poster),
+
+    worker:
+      safeProfile(worker),
+
+    assignmentFile:
+      assignment.assignment_file_url
+        ? {
+            url:
+              assignment.assignment_file_url,
+
+            name:
+              assignment.assignment_file_name
+          }
+        : null,
+
+    deliveryFile:
+      assignment.delivery_file_url
+        ? {
+            url:
+              assignment.delivery_file_url,
+
+            name:
+              assignment.delivery_file_name
+          }
+        : null,
+
+    reworkFeedback:
+      reworks
   };
 }
 
@@ -534,22 +689,26 @@ function fileFromData(data) {
    API
 ========================================================= */
 
-async function api(req, res, url) {
-  const p = url.pathname;
+async function api(req, res, u) {
+  const p = u.pathname;
   const method = req.method;
 
   let body = {};
 
   if (
-    method === "POST" ||
-    method === "PUT" ||
-    method === "PATCH"
+    [
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ].includes(method)
   ) {
-    body = await parseBody(req);
+    body =
+      await parseBody(req);
   }
 
-  const data = db();
-  const user = auth(req);
+  const user =
+    await currentUser(req);
 
   /* =======================================================
      HEALTH
@@ -559,11 +718,44 @@ async function api(req, res, url) {
     p === "/api/health" &&
     method === "GET"
   ) {
-    return send(res, 200, {
-      ok: true,
-      name: "VENZNOVA",
-      time: now()
-    });
+    try {
+      const {
+        error
+      } = await supabase
+        .from("profiles")
+        .select(
+          "id",
+          {
+            count: "exact",
+            head: true
+          }
+        );
+
+      return json(res, 200, {
+        ok: !error,
+
+        name:
+          "VENZNOVA",
+
+        database:
+          error
+            ? "error"
+            : "Supabase PostgreSQL",
+
+        time:
+          now(),
+
+        error:
+          error?.message ||
+          null
+      });
+    } catch (error) {
+      return json(res, 500, {
+        ok: false,
+        error:
+          error.message
+      });
+    }
   }
 
   /* =======================================================
@@ -586,120 +778,281 @@ async function api(req, res, url) {
       !x.joinAs ||
       !x.password
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Please fill all required fields."
       });
     }
 
-    if (String(x.password).length < 6) {
-      return send(res, 400, {
+    if (
+      String(x.password).length < 6
+    ) {
+      return json(res, 400, {
         error:
           "Password must be at least 6 characters."
       });
     }
 
-    const email = String(x.email)
-      .trim()
-      .toLowerCase();
+    const email =
+      String(x.email)
+        .trim()
+        .toLowerCase();
 
-    const rollNumber = String(
-      x.rollNumber
-    )
-      .trim()
-      .toLowerCase();
+    const rollNumber =
+      String(x.rollNumber)
+        .trim();
 
-    if (
-      data.users.some(
-        (u) => u.email === email
-      )
-    ) {
-      return send(res, 409, {
-        error:
-          "Email already registered."
-      });
-    }
-
-    if (
-      data.users.some(
-        (u) =>
-          String(u.rollNumber)
-            .toLowerCase() ===
-          rollNumber
-      )
-    ) {
-      return send(res, 409, {
-        error:
-          "Roll number already registered."
-      });
-    }
-
-    let profilePicture = null;
+    /*
+      Check existing profile.
+    */
 
     try {
-      profilePicture =
-        fileFromData(
-          x.profilePicture
-        );
-    } catch (err) {
-      return send(res, 400, {
-        error: err.message
+      const {
+        data: existing
+      } = await supabase
+        .from("profiles")
+        .select("id")
+        .or(
+          `email.eq.${email},roll_number.eq.${rollNumber}`
+        )
+        .limit(1);
+
+      if (
+        existing?.length
+      ) {
+        return json(res, 409, {
+          error:
+            "Email or roll number already registered."
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Existing profile check:",
+        error.message
+      );
+    }
+
+    /*
+      Create Supabase Auth user.
+    */
+
+    const {
+      data,
+      error
+    } =
+      await authClient.auth.signUp({
+        email:
+          email,
+
+        password:
+          String(x.password),
+
+        options: {
+          data: {
+            fullName:
+              String(
+                x.fullName
+              ).trim(),
+
+            rollNumber:
+              rollNumber,
+
+            graduationYear:
+              Number(
+                x.graduationYear
+              ),
+
+            admissionYear:
+              x.admissionYear
+                ? Number(
+                    x.admissionYear
+                  )
+                : "",
+
+            programme:
+              x.programme,
+
+            status:
+              x.status,
+
+            joinAs:
+              x.joinAs,
+
+            campus:
+              x.campus || "",
+
+            linkedin:
+              x.linkedin || "",
+
+            portfolio:
+              x.portfolio || "",
+
+            bio:
+              x.bio || "",
+
+            skills:
+              x.skills || ""
+          }
+        }
+      });
+
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
       });
     }
 
-    const token = tok();
+    if (!data?.user) {
+      return json(res, 400, {
+        error:
+          "Could not create account."
+      });
+    }
 
-    const newUser = {
-      id: id("usr"),
+    /*
+      Optional profile picture.
+    */
 
-      fullName: String(
-        x.fullName
-      ).trim(),
+    let pic = null;
 
-      rollNumber: String(
-        x.rollNumber
-      ).trim(),
+    try {
+      pic =
+        x.profilePicture
+          ? fileFromData(
+              x.profilePicture
+            )
+          : null;
+    } catch (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      email,
+    /*
+      Create application profile.
+    */
 
-      graduationYear: String(
-        x.graduationYear
-      ),
+    const profile = {
+      id:
+        data.user.id,
 
-      programme: x.programme,
+      name:
+        String(
+          x.fullName
+        ).trim(),
 
-      status: x.status,
+      email:
+        email,
 
-      joinAs: x.joinAs,
+      roll_number:
+        rollNumber,
 
-      skills: x.skills || "",
+      admission_year:
+        x.admissionYear
+          ? Number(
+              x.admissionYear
+            )
+          : null,
 
-      linkedin: x.linkedin || "",
+      graduation_year:
+        Number(
+          x.graduationYear
+        ),
 
-      portfolio: x.portfolio || "",
+      role:
+        String(
+          x.joinAs ||
+          "JUNIOR"
+        ).toUpperCase(),
 
-      bio: x.bio || "",
+      campus:
+        x.campus || null,
 
-      profilePicture:
-        profilePicture?.url || "",
+      programme:
+        x.programme,
 
-      passwordHash:
-        hash(x.password),
+      status:
+        x.status,
 
-      sessionToken: token,
+      join_as:
+        x.joinAs,
 
-      createdAt: now()
+      linkedin:
+        x.linkedin || "",
+
+      portfolio:
+        x.portfolio || "",
+
+      bio:
+        x.bio || "",
+
+      skills:
+        x.skills || "",
+
+      photo_url:
+        pic?.url || ""
     };
 
-    data.users.push(newUser);
+    const {
+      data: saved,
+      error: profileError
+    } =
+      await supabase
+        .from("profiles")
+        .insert(profile)
+        .select("*")
+        .single();
 
-    save(data);
+    /*
+      If profile insert fails, don't leave
+      authentication broken.
+    */
 
-    setSessionCookie(res, token);
+    if (profileError) {
+      console.error(
+        "Profile insert error:",
+        profileError.message
+      );
 
-    return send(res, 200, {
-      token,
-      user: safe(newUser)
+      /*
+        Try to clean up Auth account.
+      */
+
+      try {
+        await supabase.auth.admin.deleteUser(
+          data.user.id
+        );
+      } catch {}
+
+      return json(res, 400, {
+        error:
+          "Account was created in Auth but the profile could not be saved: " +
+          profileError.message
+      });
+    }
+
+    const frontendUser =
+      safeProfile(
+        saved,
+        data.user
+      );
+
+    return json(res, 200, {
+      token:
+        data.session?.access_token ||
+        "",
+
+      refreshToken:
+        data.session?.refresh_token ||
+        "",
+
+      user:
+        frontendUser,
+
+      emailConfirmationRequired:
+        !data.session
     });
   }
 
@@ -711,50 +1064,255 @@ async function api(req, res, url) {
     p === "/api/auth/login" &&
     method === "POST"
   ) {
-    const email = String(
-      body.email || ""
-    )
-      .trim()
-      .toLowerCase();
+    try {
+      const email =
+        String(
+          body.email || ""
+        )
+          .trim()
+          .toLowerCase();
 
-    const password = String(
-      body.password || ""
-    );
+      const password =
+        String(
+          body.password || ""
+        );
 
-    const foundUser = data.users.find(
-      (u) => u.email === email
-    );
+      if (!email || !password) {
+        return json(res, 400, {
+          error:
+            "Email and password are required."
+        });
+      }
 
-    if (
-      !foundUser ||
-      !verify(
-        password,
-        foundUser.passwordHash
-      )
-    ) {
-      return send(res, 401, {
+      /*
+        SUPABASE PASSWORD LOGIN
+      */
+
+      const {
+        data,
+        error
+      } =
+        await authClient.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (error) {
+        console.error(
+          "LOGIN SUPABASE ERROR:",
+          error.message
+        );
+
+        return json(res, 401, {
+          error:
+            error.message
+        });
+      }
+
+      /*
+        Make absolutely sure session exists.
+      */
+
+      if (
+        !data?.user ||
+        !data?.session
+      ) {
+        return json(res, 401, {
+          error:
+            "Supabase login succeeded but no session was returned."
+        });
+      }
+
+      const authUser =
+        data.user;
+
+      /*
+        Get application profile.
+      */
+
+      let profile =
+        await getProfile(
+          authUser.id
+        );
+
+      /*
+        If profile does not exist,
+        build one from Supabase Auth metadata.
+      */
+
+      if (!profile) {
+        const metadata =
+          authUser.user_metadata ||
+          {};
+
+        const fallbackProfile = {
+          id:
+            authUser.id,
+
+          name:
+            metadata.fullName ||
+            metadata.full_name ||
+            metadata.name ||
+            authUser.email?.split("@")[0] ||
+            "User",
+
+          email:
+            authUser.email || email,
+
+          roll_number:
+            metadata.rollNumber ||
+            metadata.roll_number ||
+            "",
+
+          admission_year:
+            metadata.admissionYear
+              ? Number(
+                  metadata.admissionYear
+                )
+              : null,
+
+          graduation_year:
+            metadata.graduationYear
+              ? Number(
+                  metadata.graduationYear
+                )
+              : null,
+
+          role:
+            String(
+              metadata.joinAs ||
+              metadata.role ||
+              "JUNIOR"
+            ).toUpperCase(),
+
+          campus:
+            metadata.campus ||
+            "",
+
+          programme:
+            metadata.programme ||
+            "BFTech",
+
+          status:
+            metadata.status ||
+            "Student",
+
+          join_as:
+            metadata.joinAs ||
+            metadata.join_as ||
+            "Student",
+
+          linkedin:
+            metadata.linkedin ||
+            "",
+
+          portfolio:
+            metadata.portfolio ||
+            "",
+
+          bio:
+            metadata.bio ||
+            "",
+
+          skills:
+            metadata.skills ||
+            "",
+
+          photo_url:
+            metadata.photoUrl ||
+            metadata.photo_url ||
+            ""
+        };
+
+        /*
+          Try to save fallback profile.
+        */
+
+        try {
+          const {
+            data: createdProfile,
+            error:
+              createError
+          } =
+            await supabase
+              .from("profiles")
+              .upsert(
+                fallbackProfile,
+                {
+                  onConflict: "id"
+                }
+              )
+              .select("*")
+              .single();
+
+          if (!createError &&
+              createdProfile) {
+            profile =
+              createdProfile;
+          } else {
+            console.error(
+              "Fallback profile save:",
+              createError?.message
+            );
+
+            /*
+              VERY IMPORTANT:
+              Even if database profile creation
+              fails, login continues.
+            */
+
+            profile =
+              fallbackProfile;
+          }
+        } catch (error) {
+          console.error(
+            "Fallback profile exception:",
+            error.message
+          );
+
+          profile =
+            fallbackProfile;
+        }
+      }
+
+      /*
+        Convert profile to exactly the format
+        expected by index.html.
+      */
+
+      const frontendUser =
+        safeProfile(
+          profile,
+          authUser
+        );
+
+      /*
+        FINAL LOGIN RESPONSE
+      */
+
+      return json(res, 200, {
+        token:
+          data.session.access_token,
+
+        refreshToken:
+          data.session.refresh_token,
+
+        user:
+          frontendUser
+      });
+
+    } catch (error) {
+      console.error(
+        "LOGIN SERVER ERROR:",
+        error
+      );
+
+      return json(res, 500, {
         error:
-          "Invalid email or password."
+          "Login server error: " +
+          error.message
       });
     }
-
-    const token = tok();
-
-    foundUser.sessionToken = token;
-
-    save(data);
-
-    /*
-      Set cookie as an additional authentication
-      method. The frontend can still use the token.
-    */
-
-    setSessionCookie(res, token);
-
-    return send(res, 200, {
-      token,
-      user: safe(foundUser)
-    });
   }
 
   /* =======================================================
@@ -765,21 +1323,16 @@ async function api(req, res, url) {
     p === "/api/auth/logout" &&
     method === "POST"
   ) {
-    if (!user) {
-      clearSessionCookie(res);
-
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    user.sessionToken = "";
-
-    save(data);
-
-    clearSessionCookie(res);
-
-    return send(res, 200, {
+    return json(res, 200, {
       ok: true
     });
   }
@@ -792,14 +1345,63 @@ async function api(req, res, url) {
     p === "/api/me" &&
     method === "GET"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    return send(res, 200, {
-      user: safe(user)
+    let profile =
+      await getProfile(
+        user.id
+      );
+
+    /*
+      Never return null user.
+    */
+
+    if (!profile) {
+      profile = {
+        id:
+          user.id,
+
+        email:
+          user.email || "",
+
+        name:
+          user.user_metadata?.fullName ||
+          user.email?.split("@")[0] ||
+          "User",
+
+        programme:
+          user.user_metadata?.programme ||
+          "BFTech",
+
+        status:
+          user.user_metadata?.status ||
+          "Student",
+
+        join_as:
+          user.user_metadata?.joinAs ||
+          "Student",
+
+        role:
+          String(
+            user.user_metadata?.joinAs ||
+            "JUNIOR"
+          ).toUpperCase()
+      };
+    }
+
+    return json(res, 200, {
+      user:
+        safeProfile(
+          profile,
+          user
+        )
     });
   }
 
@@ -811,48 +1413,87 @@ async function api(req, res, url) {
     p === "/api/users" &&
     method === "GET"
   ) {
-    const q = (
-      url.searchParams.get("q") ||
-      ""
-    ).toLowerCase();
+    const q =
+      (
+        u.searchParams.get("q") ||
+        ""
+      ).trim();
 
-    const programme = (
-      url.searchParams.get(
-        "programme"
-      ) || ""
-    ).toLowerCase();
+    const programme =
+      (
+        u.searchParams.get(
+          "programme"
+        ) || ""
+      ).trim();
 
-    let users = data.users.map(safe);
-
-    if (q) {
-      users = users.filter((x) =>
-        [
-          x.fullName,
-          x.rollNumber,
-          x.programme,
-          x.skills,
-          x.bio
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(q)
-      );
-    }
+    let query =
+      supabase
+        .from("profiles")
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        )
+        .limit(1000);
 
     if (
       programme &&
-      programme !== "all"
+      programme.toLowerCase() !==
+        "all"
     ) {
-      users = users.filter(
-        (x) =>
-          String(x.programme)
-            .toLowerCase() ===
+      query =
+        query.eq(
+          "programme",
           programme
-      );
+        );
     }
 
-    return send(res, 200, {
-      users
+    const {
+      data,
+      error
+    } = await query;
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
+    }
+
+    let users =
+      data || [];
+
+    if (q) {
+      const s =
+        q.toLowerCase();
+
+      users =
+        users.filter(
+          x =>
+            [
+              x.name,
+              x.roll_number,
+              x.programme,
+              x.skills,
+              x.bio,
+              x.role,
+              x.status
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(s)
+        );
+    }
+
+    return json(res, 200, {
+      users:
+        users.map(
+          x =>
+            safeProfile(x)
+        )
     });
   }
 
@@ -864,44 +1505,81 @@ async function api(req, res, url) {
     p === "/api/projects" &&
     method === "GET"
   ) {
-    const q = (
-      url.searchParams.get("q") ||
-      ""
-    ).toLowerCase();
+    const q =
+      (
+        u.searchParams.get(
+          "q"
+        ) || ""
+      ).toLowerCase();
 
-    let projects = data.projects
-      .filter(
-        (x) =>
-          x.visibility !==
+    const {
+      data: projects,
+      error
+    } =
+      await supabase
+        .from("projects")
+        .select("*")
+        .neq(
+          "visibility",
           "private"
-      )
-      .map((x) =>
-        pubProject(x, data)
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt) -
-          new Date(a.createdAt)
-      );
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        )
+        .limit(1000);
 
-    if (q) {
-      projects = projects.filter(
-        (x) =>
-          [
-            x.title,
-            x.description,
-            x.category,
-            x.skills,
-            x.creator?.fullName
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-      );
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
     }
 
-    return send(res, 200, {
-      projects
+    const map =
+      await getProfiles(
+        (projects || [])
+          .map(
+            x =>
+              x.user_id
+          )
+      );
+
+    let out =
+      (projects || [])
+        .map(
+          x =>
+            publicProject(
+              x,
+              map.get(
+                x.user_id
+              )
+            )
+        );
+
+    if (q) {
+      out =
+        out.filter(
+          x =>
+            [
+              x.title,
+              x.description,
+              x.category,
+              x.skills,
+              x.creator?.name
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q)
+        );
+    }
+
+    return json(res, 200, {
+      projects:
+        out
     });
   }
 
@@ -913,17 +1591,20 @@ async function api(req, res, url) {
     p === "/api/projects" &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
       !body.title ||
       !body.description
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Project title and description are required."
       });
@@ -932,27 +1613,32 @@ async function api(req, res, url) {
     let file = null;
 
     try {
-      file = fileFromData(
+      file =
         body.projectFile
-      );
-    } catch (err) {
-      return send(res, 400, {
-        error: err.message
+          ? fileFromData(
+              body.projectFile
+            )
+          : null;
+    } catch (error) {
+      return json(res, 400, {
+        error:
+          error.message
       });
     }
 
     const project = {
-      id: id("prj"),
+      user_id:
+        user.id,
 
-      userId: user.id,
+      title:
+        String(
+          body.title
+        ).trim(),
 
-      title: String(
-        body.title
-      ).trim(),
-
-      description: String(
-        body.description
-      ).trim(),
+      description:
+        String(
+          body.description
+        ).trim(),
 
       category:
         body.category ||
@@ -965,22 +1651,39 @@ async function api(req, res, url) {
         body.visibility ||
         "public",
 
-      file,
+      file_url:
+        file?.url ||
+        null,
 
-      likes: [],
-
-      createdAt: now()
+      file_name:
+        file?.name ||
+        null
     };
 
-    data.projects.push(project);
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("projects")
+        .insert(project)
+        .select("*")
+        .single();
 
-    save(data);
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-    return send(res, 200, {
+    return json(res, 200, {
       project:
-        pubProject(
-          project,
-          data
+        publicProject(
+          data,
+          await getProfile(
+            user.id
+          )
         )
     });
   }
@@ -998,52 +1701,87 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const project =
-      data.projects.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: project
+    } =
+      await supabase
+        .from("projects")
+        .select(
+          "id,likes"
+        )
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
     if (!project) {
-      return send(res, 404, {
+      return json(res, 404, {
         error:
           "Project not found"
       });
     }
 
-    project.likes =
-      project.likes || [];
+    const likes =
+      Array.isArray(
+        project.likes
+      )
+        ? [
+            ...project.likes
+          ]
+        : [];
 
-    const index =
-      project.likes.indexOf(
+    const i =
+      likes.indexOf(
         user.id
       );
 
-    if (index >= 0) {
-      project.likes.splice(
-        index,
+    if (i >= 0) {
+      likes.splice(
+        i,
         1
       );
     } else {
-      project.likes.push(
+      likes.push(
         user.id
       );
     }
 
-    save(data);
+    const {
+      error
+    } =
+      await supabase
+        .from("projects")
+        .update({
+          likes
+        })
+        .eq(
+          "id",
+          project.id
+        );
 
-    return send(res, 200, {
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
+
+    return json(res, 200, {
       likes:
-        project.likes.length,
+        likes.length,
 
       liked:
-        index < 0
+        i < 0
     });
   }
 
@@ -1055,38 +1793,129 @@ async function api(req, res, url) {
     p === "/api/doubts" &&
     method === "GET"
   ) {
-    const q = (
-      url.searchParams.get("q") ||
-      ""
-    ).toLowerCase();
+    const q =
+      (
+        u.searchParams.get(
+          "q"
+        ) || ""
+      ).toLowerCase();
 
-    let doubts = data.doubts
-      .map((x) =>
-        pubDoubt(x, data)
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt) -
-          new Date(a.createdAt)
-      );
+    const {
+      data: doubts,
+      error
+    } =
+      await supabase
+        .from("doubts")
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        )
+        .limit(1000);
 
-    if (q) {
-      doubts = doubts.filter(
-        (x) =>
-          [
-            x.title,
-            x.description,
-            x.category,
-            x.creator?.fullName
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-      );
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
     }
 
-    return send(res, 200, {
-      doubts
+    const map =
+      await getProfiles(
+        (doubts || [])
+          .map(
+            x =>
+              x.user_id
+          )
+      );
+
+    const ids =
+      (doubts || [])
+        .map(
+          x =>
+            x.id
+        );
+
+    let answers = [];
+
+    if (ids.length) {
+      const result =
+        await supabase
+          .from("answers")
+          .select("*")
+          .in(
+            "doubt_id",
+            ids
+          )
+          .order(
+            "created_at",
+            {
+              ascending: true
+            }
+          );
+
+      answers =
+        result.data ||
+        [];
+    }
+
+    const amap =
+      await getProfiles(
+        answers.map(
+          x =>
+            x.user_id
+        )
+      );
+
+    let out =
+      (doubts || [])
+        .map(
+          x =>
+            publicDoubt(
+              x,
+              map.get(
+                x.user_id
+              ),
+              answers
+                .filter(
+                  a =>
+                    a.doubt_id ===
+                    x.id
+                )
+                .map(
+                  a => ({
+                    ...a,
+                    creator:
+                      amap.get(
+                        a.user_id
+                      )
+                  })
+                )
+            )
+        );
+
+    if (q) {
+      out =
+        out.filter(
+          x =>
+            [
+              x.title,
+              x.description,
+              x.category,
+              x.creator?.name
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q)
+        );
+    }
+
+    return json(res, 200, {
+      doubts:
+        out
     });
   }
 
@@ -1098,57 +1927,77 @@ async function api(req, res, url) {
     p === "/api/doubts" &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
       !body.title ||
       !body.description
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Title and description are required."
       });
     }
 
-    const doubt = {
-      id: id("doubt"),
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("doubts")
+        .insert({
+          user_id:
+            user.id,
 
-      userId: user.id,
+          title:
+            String(
+              body.title
+            ).trim(),
 
-      title: String(
-        body.title
-      ).trim(),
+          description:
+            String(
+              body.description
+            ).trim(),
 
-      description: String(
-        body.description
-      ).trim(),
+          category:
+            body.category ||
+            "Academic",
 
-      category:
-        body.category ||
-        "Academic",
+          file_url:
+            body.fileUrl ||
+            null
+        })
+        .select("*")
+        .single();
 
-      createdAt: now()
-    };
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-    data.doubts.push(doubt);
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       doubt:
-        pubDoubt(
-          doubt,
-          data
+        publicDoubt(
+          data,
+          await getProfile(
+            user.id
+          ),
+          []
         )
     });
   }
 
   /* =======================================================
-     ANSWER
+     DOUBT ANSWER
   ======================================================= */
 
   match =
@@ -1160,73 +2009,95 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
-    }
-
-    const doubt =
-      data.doubts.find(
-        (x) =>
-          x.id === match[1]
-      );
-
-    if (!doubt) {
-      return send(res, 404, {
-        error:
-          "Doubt not found"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (!body.text) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Answer cannot be empty."
       });
     }
 
-    const answer = {
-      id: id("ans"),
+    const {
+      data: doubt
+    } =
+      await supabase
+        .from("doubts")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-      doubtId:
-        doubt.id,
+    if (!doubt) {
+      return json(res, 404, {
+        error:
+          "Doubt not found."
+      });
+    }
 
-      userId:
-        user.id,
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("answers")
+        .insert({
+          doubt_id:
+            doubt.id,
 
-      text: String(
-        body.text
-      ).trim(),
+          user_id:
+            user.id,
 
-      createdAt: now()
-    };
+          body:
+            String(
+              body.text
+            ).trim()
+        })
+        .select("*")
+        .single();
 
-    data.answers.push(answer);
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-    data.notifications.push({
-      id: id("ntf"),
+    const currentProfile =
+      await getProfile(
+        user.id
+      );
 
-      userId:
-        doubt.userId,
+    await supabase
+      .from("notifications")
+      .insert({
+        user_id:
+          doubt.user_id,
 
-      type: "answer",
+        type:
+          "answer",
 
-      text:
-        `${user.fullName} answered your doubt: ${doubt.title}`,
+        text:
+          `${currentProfile?.name || "Someone"} answered your doubt: ${doubt.title}`
+      });
 
-      createdAt: now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       answer: {
-        ...answer,
+        ...data,
+
         creator:
-          safe(user)
+          safeProfile(
+            currentProfile
+          )
       }
     });
   }
@@ -1239,42 +2110,78 @@ async function api(req, res, url) {
     p === "/api/opportunities" &&
     method === "GET"
   ) {
-    const q = (
-      url.searchParams.get("q") ||
-      ""
-    ).toLowerCase();
+    const q =
+      (
+        u.searchParams.get(
+          "q"
+        ) || ""
+      ).toLowerCase();
 
-    let opportunities =
-      data.opportunities
-        .map((x) =>
-          pubOpp(x, data)
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("opportunities")
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
         )
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt) -
-            new Date(a.createdAt)
+        .limit(1000);
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
+    }
+
+    const map =
+      await getProfiles(
+        (data || [])
+          .map(
+            x =>
+              x.user_id
+          )
+      );
+
+    let out =
+      (data || [])
+        .map(
+          x =>
+            publicOpportunity(
+              x,
+              map.get(
+                x.user_id
+              )
+            )
         );
 
     if (q) {
-      opportunities =
-        opportunities.filter(
-          (x) =>
+      out =
+        out.filter(
+          x =>
             [
               x.title,
               x.description,
               x.type,
               x.location,
               x.skills,
-              x.creator?.fullName
+              x.creator?.name
             ]
+              .filter(Boolean)
               .join(" ")
               .toLowerCase()
               .includes(q)
         );
     }
 
-    return send(res, 200, {
-      opportunities
+    return json(res, 200, {
+      opportunities:
+        out
     });
   }
 
@@ -1286,63 +2193,78 @@ async function api(req, res, url) {
     p === "/api/opportunities" &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
       !body.title ||
       !body.description
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Title and description are required."
       });
     }
 
-    const opportunity = {
-      id: id("opp"),
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("opportunities")
+        .insert({
+          user_id:
+            user.id,
 
-      userId: user.id,
+          title:
+            String(
+              body.title
+            ).trim(),
 
-      title: String(
-        body.title
-      ).trim(),
+          description:
+            String(
+              body.description
+            ).trim(),
 
-      description: String(
-        body.description
-      ).trim(),
+          type:
+            body.type ||
+            "Internship",
 
-      type:
-        body.type ||
-        "Internship",
+          location:
+            body.location ||
+            "Remote",
 
-      location:
-        body.location ||
-        "Remote",
+          skills:
+            body.skills ||
+            "",
 
-      skills:
-        body.skills || "",
+          deadline:
+            body.deadline ||
+            null
+        })
+        .select("*")
+        .single();
 
-      deadline:
-        body.deadline || "",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      createdAt: now()
-    };
-
-    data.opportunities.push(
-      opportunity
-    );
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       opportunity:
-        pubOpp(
-          opportunity,
-          data
+        publicOpportunity(
+          data,
+          await getProfile(
+            user.id
+          )
         )
     });
   }
@@ -1360,83 +2282,108 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
-    }
-
-    const opportunity =
-      data.opportunities.find(
-        (x) =>
-          x.id === match[1]
-      );
-
-    if (!opportunity) {
-      return send(res, 404, {
-        error:
-          "Opportunity not found"
-      });
-    }
-
     if (
-      data.applications.some(
-        (a) =>
-          a.opportunityId ===
-            opportunity.id &&
-          a.userId ===
-            user.id
+      !requireUser(
+        user,
+        res
       )
     ) {
-      return send(res, 409, {
+      return;
+    }
+
+    const {
+      data: opportunity
+    } =
+      await supabase
+        .from("opportunities")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
+
+    if (!opportunity) {
+      return json(res, 404, {
+        error:
+          "Opportunity not found."
+      });
+    }
+
+    const {
+      data: old
+    } =
+      await supabase
+        .from("applications")
+        .select("id")
+        .eq(
+          "opportunity_id",
+          opportunity.id
+        )
+        .eq(
+          "user_id",
+          user.id
+        )
+        .maybeSingle();
+
+    if (old) {
+      return json(res, 409, {
         error:
           "You already applied."
       });
     }
 
-    const application = {
-      id: id("app"),
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("applications")
+        .insert({
+          opportunity_id:
+            opportunity.id,
 
-      opportunityId:
-        opportunity.id,
+          user_id:
+            user.id,
 
-      userId:
-        user.id,
+          message:
+            body.message ||
+            "",
 
-      message:
-        body.message || "",
+          status:
+            "Applied"
+        })
+        .select("*")
+        .single();
 
-      status:
-        "Applied",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      createdAt: now()
-    };
+    const currentProfile =
+      await getProfile(
+        user.id
+      );
 
-    data.applications.push(
-      application
-    );
+    await supabase
+      .from("notifications")
+      .insert({
+        user_id:
+          opportunity.user_id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "application",
 
-      userId:
-        opportunity.userId,
+        text:
+          `${currentProfile?.name || "Someone"} applied for ${opportunity.title}`
+      });
 
-      type:
-        "application",
-
-      text:
-        `${user.fullName} applied for ${opportunity.title}`,
-
-      createdAt: now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
-      application
+    return json(res, 200, {
+      application:
+        data
     });
   }
 
@@ -1448,43 +2395,120 @@ async function api(req, res, url) {
     p === "/api/assignments" &&
     method === "GET"
   ) {
-    const q = (
-      url.searchParams.get("q") ||
-      ""
-    ).toLowerCase();
+    const q =
+      (
+        u.searchParams.get(
+          "q"
+        ) || ""
+      ).toLowerCase();
 
-    let assignments =
-      data.assignments
-        .map((x) =>
-          pubAssignment(x, data)
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
         )
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt) -
-            new Date(a.createdAt)
+        .limit(1000);
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
+    }
+
+    const map =
+      await getProfiles(
+        (data || [])
+          .flatMap(
+            x => [
+              x.user_id,
+              x.worker_id
+            ]
+          )
+      );
+
+    const ids =
+      (data || [])
+        .map(
+          x =>
+            x.id
+        );
+
+    const {
+      data: reworks
+    } =
+      ids.length
+        ? await supabase
+            .from(
+              "assignment_reworks"
+            )
+            .select("*")
+            .in(
+              "assignment_id",
+              ids
+            )
+            .order(
+              "round",
+              {
+                ascending: true
+              }
+            )
+        : {
+            data: []
+          };
+
+    let out =
+      (data || [])
+        .map(
+          x =>
+            publicAssignment(
+              x,
+              map.get(
+                x.user_id
+              ),
+              map.get(
+                x.worker_id
+              ),
+              (reworks || [])
+                .filter(
+                  r =>
+                    r.assignment_id ===
+                    x.id
+                )
+            )
         );
 
     if (q) {
-      assignments =
-        assignments.filter(
-          (x) =>
+      out =
+        out.filter(
+          x =>
             [
               x.title,
               x.description,
               x.category,
               x.skills,
-              x.poster?.fullName,
-              x.worker?.fullName,
+              x.poster?.name,
+              x.worker?.name,
               x.status
             ]
+              .filter(Boolean)
               .join(" ")
               .toLowerCase()
               .includes(q)
         );
     }
 
-    return send(res, 200, {
-      assignments
+    return json(res, 200, {
+      assignments:
+        out
     });
   }
 
@@ -1496,46 +2520,56 @@ async function api(req, res, url) {
     p === "/api/assignments" &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
       !body.title ||
       !body.description ||
-      !body.budget
+      body.budget == null
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Title, description and budget are required."
       });
     }
 
     const budget =
-      Number(body.budget);
+      Number(
+        body.budget
+      );
 
     if (
-      !Number.isFinite(budget) ||
+      !Number.isFinite(
+        budget
+      ) ||
       budget <= 0
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Budget must be a positive number."
       });
     }
 
-    let assignmentFile = null;
+    let file = null;
 
     try {
-      assignmentFile =
-        fileFromData(
-          body.assignmentFile
-        );
-    } catch (err) {
-      return send(res, 400, {
-        error: err.message
+      file =
+        body.assignmentFile
+          ? fileFromData(
+              body.assignmentFile
+            )
+          : null;
+    } catch (error) {
+      return json(res, 400, {
+        error:
+          error.message
       });
     }
 
@@ -1562,84 +2596,130 @@ async function api(req, res, url) {
       );
 
     const assignment = {
-      id: id("asgn"),
-
-      userId:
+      user_id:
         user.id,
 
-      title: String(
-        body.title
-      ).trim(),
+      title:
+        String(
+          body.title
+        ).trim(),
 
-      description: String(
-        body.description
-      ).trim(),
+      description:
+        String(
+          body.description
+        ).trim(),
 
       category:
         body.category ||
         "Fashion / Design",
 
       skills:
-        body.skills || "",
+        body.skills ||
+        "",
 
       budget,
 
-      advancePercent,
+      advance_percent:
+        advancePercent,
 
       deadline:
-        body.deadline || "",
+        body.deadline ||
+        null,
 
-      assignmentFile,
+      assignment_file_url:
+        file?.url ||
+        null,
 
-      status: "open",
+      assignment_file_name:
+        file?.name ||
+        null,
 
-      workerId: null,
+      status:
+        "open",
 
-      acceptedAt: null,
+      worker_id:
+        null,
 
-      advancePaid: false,
+      accepted_at:
+        null,
 
-      advancePaidAt: null,
+      advance_paid:
+        false,
 
-      submittedAt: null,
+      advance_paid_at:
+        null,
 
-      finalApprovedAt: null,
+      advance_amount:
+        null,
 
-      finalPaid: false,
+      submitted_at:
+        null,
 
-      finalPaidAt: null,
+      final_approved_at:
+        null,
 
-      reworksAllowed,
+      final_paid:
+        false,
 
-      reworksUsed: 0,
+      final_paid_at:
+        null,
 
-      reworkFeedback: [],
+      final_amount:
+        null,
 
-      history: [
-        {
-          type: "posted",
-          userId:
-            user.id,
-          createdAt:
-            now()
-        }
-      ],
+      reworks_allowed:
+        reworksAllowed,
 
-      createdAt:
-        now()
+      reworks_used:
+        0
     };
 
-    data.assignments.push(
-      assignment
-    );
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .insert(
+          assignment
+        )
+        .select("*")
+        .single();
 
-    save(data);
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-    return send(res, 200, {
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          data.id,
+
+        user_id:
+          user.id,
+
+        type:
+          "posted",
+
+        meta:
+          {}
+      });
+
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          data,
+          await getProfile(
+            user.id
+          ),
+          null,
+          []
         )
     });
   }
@@ -1657,93 +2737,146 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.userId ===
+      a.user_id ===
       user.id
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "You cannot accept your own assignment."
       });
     }
 
     if (
-      assignment.status !==
+      a.status !==
       "open"
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "This assignment is no longer open."
       });
     }
 
-    assignment.workerId =
-      user.id;
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          worker_id:
+            user.id,
 
-    assignment.status =
-      "accepted";
+          status:
+            "accepted",
 
-    assignment.acceptedAt =
-      now();
+          accepted_at:
+            now()
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .eq(
+          "status",
+          "open"
+        )
+        .select("*")
+        .single();
 
-    assignment.history.push({
-      type: "accepted",
-      userId:
-        user.id,
-      createdAt:
-        now()
-    });
+    if (error) {
+      return json(res, 409, {
+        error:
+          "This assignment was already accepted by another user."
+      });
+    }
 
-    data.notifications.push({
-      id: id("ntf"),
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
 
-      userId:
-        assignment.userId,
+        user_id:
+          user.id,
 
-      type:
-        "assignment",
+        type:
+          "accepted",
 
-      text:
-        `${user.fullName} accepted your assignment: ${assignment.title}. Advance payment is now due.`,
+        meta:
+          {}
+      });
 
-      createdAt:
-        now(),
+    const worker =
+      await getProfile(
+        user.id
+      );
 
-      read: false
-    });
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.user_id,
 
-    save(data);
+        type:
+          "assignment",
 
-    return send(res, 200, {
+        text:
+          `${worker?.name || "Someone"} accepted your assignment: ${a.title}. Advance payment is now due.`
+      });
+
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            user.id
+          ),
+
+          []
         )
     });
   }
 
   /* =======================================================
-     ADVANCE PAYMENT
+     ASSIGNMENT ADVANCE
   ======================================================= */
 
   match =
@@ -1755,135 +2888,171 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.userId !==
+      a.user_id !==
       user.id
     ) {
-      return send(res, 403, {
+      return json(res, 403, {
         error:
           "Only the assignment poster can pay the advance."
       });
     }
 
     if (
-      assignment.status !==
+      a.status !==
         "accepted" ||
-      !assignment.workerId
+      !a.worker_id
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "A worker must accept the assignment first."
       });
     }
 
-    if (
-      assignment.advancePaid
-    ) {
-      return send(res, 409, {
+    if (a.advance_paid) {
+      return json(res, 409, {
         error:
           "Advance already paid."
       });
     }
 
-    const amount = Math.round(
-      assignment.budget *
-        assignment.advancePercent /
+    const amount =
+      Math.round(
+        a.budget *
+        a.advance_percent /
         100
-    );
+      );
 
-    assignment.advancePaid =
-      true;
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          advance_paid:
+            true,
 
-    assignment.advancePaidAt =
-      now();
+          advance_paid_at:
+            now(),
 
-    assignment.advanceAmount =
-      amount;
+          advance_amount:
+            amount,
 
-    assignment.status =
-      "advance_paid";
+          status:
+            "advance_paid"
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .select("*")
+        .single();
 
-    assignment.history.push({
-      type:
-        "advance_paid",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      userId:
-        user.id,
+    await supabase
+      .from("payments")
+      .insert({
+        assignment_id:
+          a.id,
 
-      amount,
+        payer_id:
+          user.id,
 
-      createdAt:
-        now()
-    });
+        payee_id:
+          a.worker_id,
 
-    data.payments.push({
-      id: id("pay"),
+        type:
+          "advance",
 
-      assignmentId:
-        assignment.id,
+        amount,
 
-      payerId:
-        user.id,
+        status:
+          "paid"
+      });
 
-      payeeId:
-        assignment.workerId,
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
 
-      type:
-        "advance",
+        user_id:
+          user.id,
 
-      amount,
+        type:
+          "advance_paid",
 
-      status:
-        "paid",
+        meta: {
+          amount
+        }
+      });
 
-      createdAt:
-        now()
-    });
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.worker_id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "payment",
 
-      userId:
-        assignment.workerId,
+        text:
+          `Advance of ₹${amount.toLocaleString("en-IN")} paid for ${a.title}. You can start the work.`
+      });
 
-      type:
-        "payment",
-
-      text:
-        `Advance of ₹${amount.toLocaleString("en-IN")} paid for ${assignment.title}. You can start the work.`,
-
-      createdAt:
-        now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            a.worker_id
+          ),
+
+          []
         ),
 
       amount
@@ -1903,30 +3072,39 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.workerId !==
+      a.worker_id !==
       user.id
     ) {
-      return send(res, 403, {
+      return json(res, 403, {
         error:
           "Only the accepted worker can submit."
       });
@@ -1937,17 +3115,17 @@ async function api(req, res, url) {
         "advance_paid",
         "rework"
       ].includes(
-        assignment.status
+        a.status
       )
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "Advance must be paid before submission."
       });
     }
 
     if (!body.note) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Add a delivery note."
       });
@@ -1956,71 +3134,117 @@ async function api(req, res, url) {
     let file = null;
 
     try {
-      file = fileFromData(
+      file =
         body.file
-      );
-    } catch (err) {
-      return send(res, 400, {
-        error: err.message
+          ? fileFromData(
+              body.file
+            )
+          : null;
+    } catch (error) {
+      return json(res, 400, {
+        error:
+          error.message
       });
     }
 
-    assignment.deliveryNote =
-      String(
-        body.note
-      ).trim();
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          delivery_note:
+            String(
+              body.note
+            ).trim(),
 
-    assignment.deliveryFile =
-      file;
+          delivery_file_url:
+            file?.url ||
+            null,
 
-    assignment.submittedAt =
-      now();
+          delivery_file_name:
+            file?.name ||
+            null,
 
-    assignment.status =
-      "submitted";
+          submitted_at:
+            now(),
 
-    assignment.history.push({
-      type:
-        "submitted",
+          status:
+            "submitted"
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .select("*")
+        .single();
 
-      userId:
-        user.id,
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      createdAt:
-        now()
-    });
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        user_id:
+          user.id,
 
-      userId:
-        assignment.userId,
+        type:
+          "submitted",
 
-      type:
-        "submission",
+        meta:
+          {}
+      });
 
-      text:
-        `${user.fullName} submitted ${assignment.title} for review.`,
+    const worker =
+      await getProfile(
+        user.id
+      );
 
-      createdAt:
-        now(),
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.user_id,
 
-      read: false
-    });
+        type:
+          "submission",
 
-    save(data);
+        text:
+          `${worker?.name || "Worker"} submitted ${a.title} for review.`
+      });
 
-    return send(res, 200, {
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            user.id
+          ),
+
+          []
         )
     });
   }
 
   /* =======================================================
-     REWORK
+     ASSIGNMENT REWORK
   ======================================================= */
 
   match =
@@ -2032,130 +3256,203 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.userId !==
+      a.user_id !==
       user.id
     ) {
-      return send(res, 403, {
+      return json(res, 403, {
         error:
           "Only the assignment poster can request rework."
       });
     }
 
     if (
-      assignment.status !==
+      a.status !==
       "submitted"
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "Rework can be requested only after a submission."
       });
     }
 
     if (
-      assignment.reworksUsed >=
-      assignment.reworksAllowed
+      a.reworks_used >=
+      a.reworks_allowed
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
-          `Maximum ${assignment.reworksAllowed} reworks already used.`
+          `Maximum ${a.reworks_allowed} reworks already used.`
       });
     }
 
     if (!body.feedback) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Please describe the rework required."
       });
     }
 
-    assignment.reworksUsed++;
+    const round =
+      a.reworks_used + 1;
 
-    assignment.reworkFeedback.push(
-      {
-        round:
-          assignment.reworksUsed,
+    const {
+      error: reworkError
+    } =
+      await supabase
+        .from(
+          "assignment_reworks"
+        )
+        .insert({
+          assignment_id:
+            a.id,
+
+          round,
+
+          feedback:
+            String(
+              body.feedback
+            ).trim(),
+
+          user_id:
+            user.id
+        });
+
+    if (reworkError) {
+      return json(res, 400, {
+        error:
+          reworkError.message
+      });
+    }
+
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          reworks_used:
+            round,
+
+          status:
+            "rework"
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .select("*")
+        .single();
+
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
+
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
+
+        user_id:
+          user.id,
+
+        type:
+          "rework",
+
+        meta: {
+          round
+        }
+      });
+
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.worker_id,
+
+        type:
+          "rework",
 
         text:
-          String(
-            body.feedback
-          ).trim(),
+          `Rework ${round}/${a.reworks_allowed} requested for ${a.title}.`
+      });
 
-        createdAt:
-          now(),
+    const {
+      data: rw
+    } =
+      await supabase
+        .from(
+          "assignment_reworks"
+        )
+        .select("*")
+        .eq(
+          "assignment_id",
+          a.id
+        )
+        .order(
+          "round",
+          {
+            ascending: true
+          }
+        );
 
-        userId:
-          user.id
-      }
-    );
-
-    assignment.status =
-      "rework";
-
-    assignment.history.push({
-      type:
-        "rework",
-
-      userId:
-        user.id,
-
-      round:
-        assignment.reworksUsed,
-
-      createdAt:
-        now()
-    });
-
-    data.notifications.push({
-      id: id("ntf"),
-
-      userId:
-        assignment.workerId,
-
-      type:
-        "rework",
-
-      text:
-        `Rework ${assignment.reworksUsed}/${assignment.reworksAllowed} requested for ${assignment.title}.`,
-
-      createdAt:
-        now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            a.worker_id
+          ),
+
+          rw || []
         )
     });
   }
 
   /* =======================================================
-     APPROVE
+     ASSIGNMENT APPROVE
   ======================================================= */
 
   match =
@@ -2167,87 +3464,128 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.userId !==
+      a.user_id !==
       user.id
     ) {
-      return send(res, 403, {
+      return json(res, 403, {
         error:
           "Only the poster can approve the work."
       });
     }
 
     if (
-      assignment.status !==
+      a.status !==
       "submitted"
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "There is no submission waiting for approval."
       });
     }
 
-    assignment.status =
-      "approved_payment_due";
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          status:
+            "approved_payment_due",
 
-    assignment.finalApprovedAt =
-      now();
+          final_approved_at:
+            now()
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .select("*")
+        .single();
 
-    assignment.history.push({
-      type:
-        "approved",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      userId:
-        user.id,
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
 
-      createdAt:
-        now()
-    });
+        user_id:
+          user.id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "approved",
 
-      userId:
-        assignment.workerId,
+        meta:
+          {}
+      });
 
-      type:
-        "approval",
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.worker_id,
 
-      text:
-        `Your work for ${assignment.title} was approved. Final payment is due.`,
+        type:
+          "approval",
 
-      createdAt:
-        now(),
+        text:
+          `Your work for ${a.title} was approved. Final payment is due.`
+      });
 
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            a.worker_id
+          ),
+
+          []
         )
     });
   }
@@ -2265,130 +3603,167 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const assignment =
-      data.assignments.find(
-        (x) =>
-          x.id === match[1]
-      );
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
 
-    if (!assignment) {
-      return send(res, 404, {
+    if (!a) {
+      return json(res, 404, {
         error:
-          "Assignment not found"
+          "Assignment not found."
       });
     }
 
     if (
-      assignment.userId !==
+      a.user_id !==
       user.id
     ) {
-      return send(res, 403, {
+      return json(res, 403, {
         error:
           "Only the assignment poster can pay the final amount."
       });
     }
 
     if (
-      assignment.status !==
+      a.status !==
       "approved_payment_due"
     ) {
-      return send(res, 409, {
+      return json(res, 409, {
         error:
           "Approve the final submission first."
       });
     }
 
     const amount =
-      assignment.budget -
+      a.budget -
       (
-        assignment.advanceAmount ||
+        a.advance_amount ||
         Math.round(
-          assignment.budget *
-            assignment.advancePercent /
-            100
+          a.budget *
+          a.advance_percent /
+          100
         )
       );
 
-    assignment.finalPaid =
-      true;
+    const {
+      data: updated,
+      error
+    } =
+      await supabase
+        .from("assignments")
+        .update({
+          final_paid:
+            true,
 
-    assignment.finalPaidAt =
-      now();
+          final_paid_at:
+            now(),
 
-    assignment.finalAmount =
-      amount;
+          final_amount:
+            amount,
 
-    assignment.status =
-      "completed";
+          status:
+            "completed"
+        })
+        .eq(
+          "id",
+          a.id
+        )
+        .select("*")
+        .single();
 
-    assignment.history.push({
-      type:
-        "final_paid",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      userId:
-        user.id,
+    await supabase
+      .from("payments")
+      .insert({
+        assignment_id:
+          a.id,
 
-      amount,
+        payer_id:
+          user.id,
 
-      createdAt:
-        now()
-    });
+        payee_id:
+          a.worker_id,
 
-    data.payments.push({
-      id: id("pay"),
+        type:
+          "final",
 
-      assignmentId:
-        assignment.id,
+        amount,
 
-      payerId:
-        user.id,
+        status:
+          "paid"
+      });
 
-      payeeId:
-        assignment.workerId,
+    await supabase
+      .from(
+        "assignment_history"
+      )
+      .insert({
+        assignment_id:
+          a.id,
 
-      type:
-        "final",
+        user_id:
+          user.id,
 
-      amount,
+        type:
+          "final_paid",
 
-      status:
-        "paid",
+        meta: {
+          amount
+        }
+      });
 
-      createdAt:
-        now()
-    });
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          a.worker_id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "payment",
 
-      userId:
-        assignment.workerId,
+        text:
+          `Final payment of ₹${amount.toLocaleString("en-IN")} paid. Assignment completed: ${a.title}`
+      });
 
-      type:
-        "payment",
-
-      text:
-        `Final payment of ₹${amount.toLocaleString("en-IN")} paid. Assignment completed: ${assignment.title}`,
-
-      createdAt:
-        now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
+    return json(res, 200, {
       assignment:
-        pubAssignment(
-          assignment,
-          data
+        publicAssignment(
+          updated,
+
+          await getProfile(
+            a.user_id
+          ),
+
+          await getProfile(
+            a.worker_id
+          ),
+
+          []
         ),
 
       amount
@@ -2396,7 +3771,85 @@ async function api(req, res, url) {
   }
 
   /* =======================================================
-     CONNECTION
+     ASSIGNMENT HISTORY
+  ======================================================= */
+
+  match =
+    p.match(
+      /^\/api\/assignments\/([^/]+)\/history$/
+    );
+
+  if (
+    match &&
+    method === "GET"
+  ) {
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
+    }
+
+    const {
+      data: a
+    } =
+      await supabase
+        .from("assignments")
+        .select("*")
+        .eq(
+          "id",
+          match[1]
+        )
+        .maybeSingle();
+
+    if (!a) {
+      return json(res, 404, {
+        error:
+          "Assignment not found."
+      });
+    }
+
+    if (
+      a.user_id !==
+        user.id &&
+      a.worker_id !==
+        user.id
+    ) {
+      return json(res, 403, {
+        error:
+          "Not allowed."
+      });
+    }
+
+    const {
+      data
+    } =
+      await supabase
+        .from(
+          "assignment_history"
+        )
+        .select("*")
+        .eq(
+          "assignment_id",
+          a.id
+        )
+        .order(
+          "created_at",
+          {
+            ascending: true
+          }
+        );
+
+    return json(res, 200, {
+      history:
+        data || []
+    });
+  }
+
+  /* =======================================================
+     CONNECTION CREATE
   ======================================================= */
 
   match =
@@ -2408,133 +3861,181 @@ async function api(req, res, url) {
     match &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
-      match[1] === user.id
+      match[1] ===
+      user.id
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "You cannot connect with yourself."
       });
     }
 
     const target =
-      data.users.find(
-        (x) =>
-          x.id === match[1]
+      await getProfile(
+        match[1]
       );
 
     if (!target) {
-      return send(res, 404, {
+      return json(res, 404, {
         error:
           "User not found."
       });
     }
 
-    let connection =
-      data.connections.find(
-        (x) =>
-          (
-            x.from === user.id &&
-            x.to === target.id
-          ) ||
-          (
-            x.from === target.id &&
-            x.to === user.id
-          )
-      );
+    const {
+      data: old
+    } =
+      await supabase
+        .from(
+          "connections"
+        )
+        .select("*")
+        .or(
+          `and(from_id.eq.${user.id},to_id.eq.${target.id}),and(from_id.eq.${target.id},to_id.eq.${user.id})`
+        )
+        .maybeSingle();
 
-    if (connection) {
-      return send(res, 200, {
-        connection
+    if (old) {
+      return json(res, 200, {
+        connection:
+          old
       });
     }
 
-    connection = {
-      id: id("con"),
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "connections"
+        )
+        .insert({
+          from_id:
+            user.id,
 
-      from:
-        user.id,
+          to_id:
+            target.id,
 
-      to:
-        target.id,
+          status:
+            "connected"
+        })
+        .select("*")
+        .single();
 
-      status:
-        "connected",
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      createdAt:
-        now()
-    };
+    const currentProfile =
+      await getProfile(
+        user.id
+      );
 
-    data.connections.push(
-      connection
-    );
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          target.id,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "connection",
 
-      userId:
-        target.id,
+        text:
+          `${currentProfile?.name || "Someone"} connected with you`
+      });
 
-      type:
-        "connection",
-
-      text:
-        `${user.fullName} connected with you`,
-
-      createdAt:
-        now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
-      connection
+    return json(res, 200, {
+      connection:
+        data
     });
   }
 
   /* =======================================================
-     CONNECTIONS
+     CONNECTIONS GET
   ======================================================= */
 
   if (
     p === "/api/connections" &&
     method === "GET"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
+    }
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "connections"
+        )
+        .select("*")
+        .or(
+          `from_id.eq.${user.id},to_id.eq.${user.id}`
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        );
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
       });
     }
 
     const ids =
-      data.connections
-        .filter(
-          (c) =>
-            c.from === user.id ||
-            c.to === user.id
-        )
+      (data || [])
         .map(
-          (c) =>
-            c.from === user.id
-              ? c.to
-              : c.from
+          c =>
+            c.from_id ===
+            user.id
+              ? c.to_id
+              : c.from_id
         );
 
-    return send(res, 200, {
+    const map =
+      await getProfiles(
+        ids
+      );
+
+    return json(res, 200, {
       connections:
-        data.users
-          .filter((x) =>
-            ids.includes(x.id)
+        ids
+          .map(
+            id =>
+              safeProfile(
+                map.get(id)
+              )
           )
-          .map(safe)
+          .filter(
+            Boolean
+          )
     });
   }
 
@@ -2546,127 +4047,153 @@ async function api(req, res, url) {
     p === "/api/messages" &&
     method === "GET"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     const other =
-      url.searchParams.get(
+      u.searchParams.get(
         "userId"
       );
 
-    return send(res, 200, {
+    if (!other) {
+      return json(res, 400, {
+        error:
+          "userId is required."
+      });
+    }
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "messages"
+        )
+        .select("*")
+        .or(
+          `and(from_id.eq.${user.id},to_id.eq.${other}),and(from_id.eq.${other},to_id.eq.${user.id})`
+        )
+        .order(
+          "created_at",
+          {
+            ascending: true
+          }
+        )
+        .limit(500);
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
+    }
+
+    return json(res, 200, {
       messages:
-        data.messages
-          .filter(
-            (x) =>
-              (
-                x.from ===
-                  user.id &&
-                x.to ===
-                  other
-              ) ||
-              (
-                x.from ===
-                  other &&
-                x.to ===
-                  user.id
-              )
-          )
-          .sort(
-            (a, b) =>
-              new Date(
-                a.createdAt
-              ) -
-              new Date(
-                b.createdAt
-              )
-          )
+        data || []
     });
   }
 
   /* =======================================================
-     MESSAGE POST
+     MESSAGE CREATE
   ======================================================= */
 
   if (
     p === "/api/messages" &&
     method === "POST"
   ) {
-    if (!user) {
-      return send(res, 401, {
-        error: "Login required"
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
     if (
       !body.to ||
       !body.text
     ) {
-      return send(res, 400, {
+      return json(res, 400, {
         error:
           "Recipient and message required."
       });
     }
 
     if (
-      !data.users.some(
-        (x) =>
-          x.id === body.to
+      !(
+        await getProfile(
+          body.to
+        )
       )
     ) {
-      return send(res, 404, {
+      return json(res, 404, {
         error:
           "User not found."
       });
     }
 
-    const message = {
-      id: id("msg"),
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "messages"
+        )
+        .insert({
+          from_id:
+            user.id,
 
-      from:
-        user.id,
+          to_id:
+            body.to,
 
-      to:
-        body.to,
+          text:
+            String(
+              body.text
+            ).trim()
+        })
+        .select("*")
+        .single();
 
-      text:
-        String(
-          body.text
-        ).trim(),
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
 
-      createdAt:
-        now()
-    };
+    const currentProfile =
+      await getProfile(
+        user.id
+      );
 
-    data.messages.push(
-      message
-    );
+    await supabase
+      .from(
+        "notifications"
+      )
+      .insert({
+        user_id:
+          body.to,
 
-    data.notifications.push({
-      id: id("ntf"),
+        type:
+          "message",
 
-      userId:
-        body.to,
+        text:
+          `New message from ${currentProfile?.name || "Someone"}`
+      });
 
-      type:
-        "message",
-
-      text:
-        `New message from ${user.fullName}`,
-
-      createdAt:
-        now(),
-
-      read: false
-    });
-
-    save(data);
-
-    return send(res, 200, {
-      message
+    return json(res, 200, {
+      message:
+        data
     });
   }
 
@@ -2678,122 +4205,471 @@ async function api(req, res, url) {
     p === "/api/dashboard" &&
     method === "GET"
   ) {
-    if (!user) {
-      console.log(
-        "DASHBOARD AUTH FAILED",
-        {
-          hasAuthorization:
-            !!req.headers.authorization,
-
-          hasCookie:
-            !!req.headers.cookie
-        }
-      );
-
-      return send(res, 401, {
-        error:
-          "Login required."
-      });
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
     }
 
-    const mine = (
-      array,
-      key = "userId"
-    ) =>
-      array.filter(
-        (item) =>
-          item[key] === user.id
+    const [
+      projectsResult,
+      doubtsResult,
+      opportunitiesResult,
+      assignmentsResult,
+      paymentsResult,
+      applicationsResult,
+      connectionsResult,
+      notificationsResult
+    ] =
+      await Promise.all([
+        supabase
+          .from("projects")
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from("doubts")
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "opportunities"
+          )
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "assignments"
+          )
+          .select("*")
+          .or(
+            `user_id.eq.${user.id},worker_id.eq.${user.id}`
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "payments"
+          )
+          .select("*")
+          .or(
+            `payer_id.eq.${user.id},payee_id.eq.${user.id}`
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "applications"
+          )
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "connections"
+          )
+          .select("*")
+          .or(
+            `from_id.eq.${user.id},to_id.eq.${user.id}`
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          ),
+
+        supabase
+          .from(
+            "notifications"
+          )
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(30)
+      ]);
+
+    const projects =
+      projectsResult.data ||
+      [];
+
+    const doubts =
+      doubtsResult.data ||
+      [];
+
+    const opportunities =
+      opportunitiesResult.data ||
+      [];
+
+    const assignments =
+      assignmentsResult.data ||
+      [];
+
+    const payments =
+      paymentsResult.data ||
+      [];
+
+    const applications =
+      applicationsResult.data ||
+      [];
+
+    const connections =
+      connectionsResult.data ||
+      [];
+
+    const notifications =
+      notificationsResult.data ||
+      [];
+
+    const pmap =
+      await getProfiles([
+        ...projects.map(
+          x =>
+            x.user_id
+        ),
+
+        ...doubts.map(
+          x =>
+            x.user_id
+        ),
+
+        ...opportunities.map(
+          x =>
+            x.user_id
+        ),
+
+        ...assignments.flatMap(
+          x => [
+            x.user_id,
+            x.worker_id
+          ]
+        )
+      ]);
+
+    const aids =
+      assignments.map(
+        x =>
+          x.id
       );
 
-    return send(res, 200, {
-      user: safe(user),
+    const {
+      data: reworks
+    } =
+      aids.length
+        ? await supabase
+            .from(
+              "assignment_reworks"
+            )
+            .select("*")
+            .in(
+              "assignment_id",
+              aids
+            )
+        : {
+            data: []
+          };
 
+    return json(res, 200, {
       projects:
-        mine(
-          data.projects
-        ).map((x) =>
-          pubProject(
-            x,
-            data
-          )
+        projects.map(
+          x =>
+            publicProject(
+              x,
+              pmap.get(
+                x.user_id
+              )
+            )
         ),
 
       doubts:
-        mine(
-          data.doubts
-        ).map((x) =>
-          pubDoubt(
-            x,
-            data
-          )
+        doubts.map(
+          x =>
+            publicDoubt(
+              x,
+              pmap.get(
+                x.user_id
+              ),
+              []
+            )
         ),
 
       opportunities:
-        mine(
-          data.opportunities
-        ).map((x) =>
-          pubOpp(
-            x,
-            data
-          )
+        opportunities.map(
+          x =>
+            publicOpportunity(
+              x,
+              pmap.get(
+                x.user_id
+              )
+            )
         ),
 
       assignments:
-        data.assignments
-          .filter(
-            (x) =>
-              x.userId ===
-                user.id ||
-              x.workerId ===
-                user.id
-          )
-          .map((x) =>
-            pubAssignment(
+        assignments.map(
+          x =>
+            publicAssignment(
               x,
-              data
+
+              pmap.get(
+                x.user_id
+              ),
+
+              pmap.get(
+                x.worker_id
+              ),
+
+              (reworks || [])
+                .filter(
+                  r =>
+                    r.assignment_id ===
+                    x.id
+                )
             )
-          ),
+        ),
 
       payments:
-        data.payments.filter(
-          (x) =>
-            x.payerId ===
-              user.id ||
-            x.payeeId ===
-              user.id
-        ),
+        payments,
 
       applications:
-        mine(
-          data.applications
-        ),
+        applications,
 
       connections:
-        data.connections.filter(
-          (x) =>
-            x.from ===
-              user.id ||
-            x.to ===
-              user.id
-        ),
+        connections,
 
       notifications:
-        data.notifications
-          .filter(
-            (x) =>
-              x.userId ===
-              user.id
-          )
-          .sort(
-            (a, b) =>
-              new Date(
-                b.createdAt
-              ) -
-              new Date(
-                a.createdAt
-              )
-          )
-          .slice(0, 30)
+        notifications
+    });
+  }
+
+  /* =======================================================
+     NOTIFICATIONS
+  ======================================================= */
+
+  if (
+    p === "/api/notifications" &&
+    method === "GET"
+  ) {
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
+    }
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "notifications"
+        )
+        .select("*")
+        .eq(
+          "user_id",
+          user.id
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        )
+        .limit(100);
+
+    if (error) {
+      return json(res, 500, {
+        error:
+          error.message
+      });
+    }
+
+    return json(res, 200, {
+      notifications:
+        data || []
+    });
+  }
+
+  /* =======================================================
+     NOTIFICATION READ
+  ======================================================= */
+
+  match =
+    p.match(
+      /^\/api\/notifications\/([^/]+)\/read$/
+    );
+
+  if (
+    match &&
+    method === "POST"
+  ) {
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
+    }
+
+    const {
+      error
+    } =
+      await supabase
+        .from(
+          "notifications"
+        )
+        .update({
+          read:
+            true
+        })
+        .eq(
+          "id",
+          match[1]
+        )
+        .eq(
+          "user_id",
+          user.id
+        );
+
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
+
+    return json(res, 200, {
+      ok:
+        true
+    });
+  }
+
+  /* =======================================================
+     REPORTS
+  ======================================================= */
+
+  if (
+    p === "/api/reports" &&
+    method === "POST"
+  ) {
+    if (
+      !requireUser(
+        user,
+        res
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !body.targetType ||
+      !body.reason
+    ) {
+      return json(res, 400, {
+        error:
+          "Target and reason are required."
+      });
+    }
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from(
+          "reports"
+        )
+        .insert({
+          reporter_id:
+            user.id,
+
+          target_type:
+            body.targetType,
+
+          target_id:
+            body.targetId ||
+            null,
+
+          reason:
+            String(
+              body.reason
+            ).trim()
+        })
+        .select("*")
+        .single();
+
+    if (error) {
+      return json(res, 400, {
+        error:
+          error.message
+      });
+    }
+
+    return json(res, 200, {
+      report:
+        data
     });
   }
 
@@ -2801,162 +4677,190 @@ async function api(req, res, url) {
      UNKNOWN API
   ======================================================= */
 
-  return send(res, 404, {
+  return json(res, 404, {
     error:
       "API route not found"
   });
 }
 
 /* =========================================================
-   MIME
+   MIME TYPES
 ========================================================= */
 
 function mime(file) {
-  const extension =
-    path.extname(file)
-      .slice(1)
-      .toLowerCase();
+  const ext =
+    path.extname(
+      file
+    ).toLowerCase();
+
+  const types = {
+    ".html":
+      "text/html; charset=utf-8",
+
+    ".css":
+      "text/css; charset=utf-8",
+
+    ".js":
+      "text/javascript; charset=utf-8",
+
+    ".json":
+      "application/json; charset=utf-8",
+
+    ".png":
+      "image/png",
+
+    ".jpg":
+      "image/jpeg",
+
+    ".jpeg":
+      "image/jpeg",
+
+    ".webp":
+      "image/webp",
+
+    ".gif":
+      "image/gif",
+
+    ".pdf":
+      "application/pdf",
+
+    ".zip":
+      "application/zip",
+
+    ".doc":
+      "application/msword",
+
+    ".docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  };
 
   return (
-    {
-      html:
-        "text/html; charset=utf-8",
-
-      css:
-        "text/css; charset=utf-8",
-
-      js:
-        "text/javascript; charset=utf-8",
-
-      json:
-        "application/json",
-
-      png:
-        "image/png",
-
-      jpg:
-        "image/jpeg",
-
-      jpeg:
-        "image/jpeg",
-
-      webp:
-        "image/webp",
-
-      gif:
-        "image/gif",
-
-      pdf:
-        "application/pdf"
-    }[extension] ||
+    types[ext] ||
     "application/octet-stream"
   );
 }
 
 /* =========================================================
-   SERVER
+   HTTP SERVER
 ========================================================= */
 
 const server =
   http.createServer(
-    async (req, res) => {
+    async (
+      req,
+      res
+    ) => {
       try {
-        /* -----------------------------------------------
-           CORS / PREFLIGHT
-        ------------------------------------------------ */
+
+        /*
+          CORS preflight
+        */
 
         if (
           req.method ===
           "OPTIONS"
         ) {
-          res.writeHead(204, {
-            "Access-Control-Allow-Origin":
-              "*",
+          res.writeHead(
+            204,
+            {
+              "Access-Control-Allow-Origin":
+                "*",
 
-            "Access-Control-Allow-Headers":
-              "Content-Type, Authorization",
+              "Access-Control-Allow-Headers":
+                "Content-Type, Authorization",
 
-            "Access-Control-Allow-Methods":
-              "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-
-            "Access-Control-Allow-Credentials":
-              "true"
-          });
+              "Access-Control-Allow-Methods":
+                "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            }
+          );
 
           return res.end();
         }
 
-        const url =
+        const u =
           new URL(
             req.url,
-            "http://localhost"
+            `http://localhost:${PORT}`
           );
 
-        /* -----------------------------------------------
-           API
-        ------------------------------------------------ */
+        /*
+          API
+        */
 
         if (
-          url.pathname.startsWith(
+          u.pathname.startsWith(
             "/api/"
           )
         ) {
           return await api(
             req,
             res,
-            url
+            u
           );
         }
 
-        /* -----------------------------------------------
-           UPLOADS
-        ------------------------------------------------ */
+        /*
+          Uploaded files
+        */
 
         if (
-          url.pathname.startsWith(
+          u.pathname.startsWith(
             "/uploads/"
           )
         ) {
+          const name =
+            path.basename(
+              u.pathname
+            );
+
           const file =
             path.join(
-              UP,
-              path.basename(
-                url.pathname
-              )
+              UPLOADS,
+              name
             );
 
           if (
-            !fs.existsSync(file)
+            !fs.existsSync(
+              file
+            )
           ) {
-            return send(
+            return text(
               res,
               404,
-              "Not found",
-              "text/plain"
+              "Not found"
             );
           }
 
-          res.writeHead(200, {
-            "Content-Type":
-              mime(file),
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                mime(file),
 
-            "Cache-Control":
-              "public, max-age=31536000"
-          });
+              "Cache-Control":
+                "public, max-age=3600",
+
+              "Access-Control-Allow-Origin":
+                "*"
+            }
+          );
 
           return fs
-            .createReadStream(file)
+            .createReadStream(
+              file
+            )
             .pipe(res);
         }
 
-        /* -----------------------------------------------
-           STATIC FRONTEND
-        ------------------------------------------------ */
+        /*
+          Frontend
+        */
 
         let file;
 
         if (
-          url.pathname === "/"
+          u.pathname ===
+          "/"
         ) {
           file =
             path.join(
@@ -2964,40 +4868,34 @@ const server =
               "index.html"
             );
         } else {
-          const requested =
-            path.normalize(
-              url.pathname
-            ).replace(
-              /^[/\\]+/,
-              ""
-            );
-
           file =
             path.join(
               PUBLIC,
-              requested
+              path
+                .normalize(
+                  u.pathname
+                )
+                .replace(
+                  /^[/\\]+/,
+                  ""
+                )
             );
         }
 
         /*
-          Prevent access outside public.
+          Security:
+          don't allow files outside public.
         */
 
-        const publicRoot =
-          path.resolve(PUBLIC);
-
-        const resolvedFile =
-          path.resolve(file);
-
         if (
-          !resolvedFile.startsWith(
-            publicRoot
+          !file.startsWith(
+            PUBLIC
           ) ||
           !fs.existsSync(
-            resolvedFile
+            file
           ) ||
           fs.statSync(
-            resolvedFile
+            file
           ).isDirectory()
         ) {
           file =
@@ -3005,24 +4903,39 @@ const server =
               PUBLIC,
               "index.html"
             );
-        } else {
-          file =
-            resolvedFile;
         }
 
-        res.writeHead(200, {
-          "Content-Type":
-            mime(file),
+        if (
+          !fs.existsSync(
+            file
+          )
+        ) {
+          return text(
+            res,
+            404,
+            "public/index.html not found"
+          );
+        }
 
-          "Cache-Control":
-            "no-cache"
-        });
+        res.writeHead(
+          200,
+          {
+            "Content-Type":
+              mime(file),
+
+            "Cache-Control":
+              "no-cache"
+          }
+        );
 
         return fs
-          .createReadStream(file)
+          .createReadStream(
+            file
+          )
           .pipe(res);
 
       } catch (error) {
+
         console.error(
           "SERVER ERROR:",
           error
@@ -3031,7 +4944,7 @@ const server =
         if (
           !res.headersSent
         ) {
-          return send(
+          return json(
             res,
             500,
             {
@@ -3046,23 +4959,41 @@ const server =
   );
 
 /* =========================================================
-   RENDER PORT
+   START
 ========================================================= */
 
 server.listen(
   PORT,
   "0.0.0.0",
   () => {
+    console.log("");
     console.log(
-      `VENZNOVA running on port ${PORT}`
+      "=========================================="
     );
-
     console.log(
-      `Public folder: ${PUBLIC}`
+      "          VENZNOVA IS RUNNING"
     );
-
     console.log(
-      `Database: ${DB}`
+      "=========================================="
     );
+    console.log(
+      `PORT: ${PORT}`
+    );
+    console.log(
+      "HOST: 0.0.0.0"
+    );
+    console.log(
+      `PUBLIC: ${PUBLIC}`
+    );
+    console.log(
+      "DATABASE: Supabase PostgreSQL"
+    );
+    console.log(
+      "AUTH: Supabase Auth"
+    );
+    console.log(
+      "=========================================="
+    );
+    console.log("");
   }
 );
