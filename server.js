@@ -36,10 +36,11 @@ const SUPABASE_URL = cleanEnv(
   process.env.NEXT_PUBLIC_SUPABASE_URL
 );
 
-// Prefer the current Supabase publishable key.
+// Use the standard Supabase anon key first.
+// Also supports the newer publishable-key variable name.
 const SUPABASE_ANON_KEY = cleanEnv(
-  process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
