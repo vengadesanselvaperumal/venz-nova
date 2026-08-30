@@ -23,18 +23,45 @@ Supports both old and new Supabase key names
 ========================================================
 */
 
-const SUPABASE_URL =
+function cleanEnv(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .trim()
+    .replace(/^['\"]|['\"]$/g, "")
+    .trim();
+}
+
+const SUPABASE_URL = cleanEnv(
   process.env.SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+);
 
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
+// Prefer the current Supabase publishable key.
+const SUPABASE_ANON_KEY = cleanEnv(
   process.env.SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SECRET_KEY;
+// Backend-only secret key.
+const SUPABASE_SERVICE_ROLE_KEY = cleanEnv(
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const PLATFORM_COMMISSION_PERCENT = Number(
+  cleanEnv(process.env.PLATFORM_COMMISSION_PERCENT || "10")
+);
+
+if (
+  !Number.isFinite(PLATFORM_COMMISSION_PERCENT) ||
+  PLATFORM_COMMISSION_PERCENT < 0 ||
+  PLATFORM_COMMISSION_PERCENT > 100
+) {
+  throw new Error(
+    "PLATFORM_COMMISSION_PERCENT must be between 0 and 100."
+  );
+}
 
 /*
 ========================================================
@@ -2898,58 +2925,69 @@ async function api(req, res, u) {
     }
 
     const {
-      data: a
+      data: a,
+      error: assignmentError
     } =
       await supabase
         .from("assignments")
         .select("*")
-        .eq(
-          "id",
-          match[1]
-        )
+        .eq("id", match[1])
         .maybeSingle();
+
+    if (assignmentError) {
+      return json(res, 500, {
+        error: assignmentError.message
+      });
+    }
 
     if (!a) {
       return json(res, 404, {
-        error:
-          "Assignment not found."
+        error: "Assignment not found."
       });
     }
 
-    if (
-      a.user_id !==
-      user.id
-    ) {
+    if (a.user_id !== user.id) {
       return json(res, 403, {
-        error:
-          "Only the assignment poster can pay the advance."
+        error: "Only the assignment poster can pay the advance."
       });
     }
 
     if (
-      a.status !==
-        "accepted" ||
+      a.status !== "accepted" ||
       !a.worker_id
     ) {
       return json(res, 409, {
-        error:
-          "A worker must accept the assignment first."
+        error: "A worker must accept the assignment first."
       });
     }
 
     if (a.advance_paid) {
       return json(res, 409, {
-        error:
-          "Advance already paid."
+        error: "Advance already paid."
       });
     }
 
-    const amount =
+    const grossAmount =
       Math.round(
-        a.budget *
-        a.advance_percent /
+        Number(a.budget) *
+        Number(a.advance_percent) /
+        100 *
         100
-      );
+      ) / 100;
+
+    const commissionAmount =
+      Math.round(
+        grossAmount *
+        PLATFORM_COMMISSION_PERCENT /
+        100 *
+        100
+      ) / 100;
+
+    const workerAmount =
+      Math.round(
+        (grossAmount - commissionAmount) *
+        100
+      ) / 100;
 
     const {
       data: updated,
@@ -2958,104 +2996,77 @@ async function api(req, res, u) {
       await supabase
         .from("assignments")
         .update({
-          advance_paid:
-            true,
-
-          advance_paid_at:
-            now(),
-
-          advance_amount:
-            amount,
-
-          status:
-            "advance_paid"
+          advance_paid: true,
+          advance_paid_at: now(),
+          advance_amount: grossAmount,
+          status: "advance_paid"
         })
-        .eq(
-          "id",
-          a.id
-        )
+        .eq("id", a.id)
         .select("*")
         .single();
 
     if (error) {
       return json(res, 400, {
-        error:
-          error.message
+        error: error.message
+      });
+    }
+
+    const {
+      error: paymentError
+    } =
+      await supabase
+        .from("payments")
+        .insert({
+          assignment_id: a.id,
+          payer_id: user.id,
+          payee_id: a.worker_id,
+          type: "advance",
+          amount: workerAmount,
+          status: "paid"
+        });
+
+    if (paymentError) {
+      return json(res, 400, {
+        error: paymentError.message
       });
     }
 
     await supabase
-      .from("payments")
+      .from("assignment_history")
       .insert({
-        assignment_id:
-          a.id,
-
-        payer_id:
-          user.id,
-
-        payee_id:
-          a.worker_id,
-
-        type:
-          "advance",
-
-        amount,
-
-        status:
-          "paid"
-      });
-
-    await supabase
-      .from(
-        "assignment_history"
-      )
-      .insert({
-        assignment_id:
-          a.id,
-
-        user_id:
-          user.id,
-
-        type:
-          "advance_paid",
-
+        assignment_id: a.id,
+        user_id: user.id,
+        type: "advance_paid",
         meta: {
-          amount
+          grossAmount,
+          commissionPercent: PLATFORM_COMMISSION_PERCENT,
+          commissionAmount,
+          workerAmount
         }
       });
 
     await supabase
-      .from(
-        "notifications"
-      )
+      .from("notifications")
       .insert({
-        user_id:
-          a.worker_id,
-
-        type:
-          "payment",
-
-        text:
-          `Advance of ₹${amount.toLocaleString("en-IN")} paid for ${a.title}. You can start the work.`
+        user_id: a.worker_id,
+        type: "payment",
+        text: `Advance of ₹${workerAmount.toLocaleString("en-IN")} paid to you for ${a.title}.`
       });
 
     return json(res, 200, {
-      assignment:
-        publicAssignment(
-          updated,
-
-          await getProfile(
-            a.user_id
-          ),
-
-          await getProfile(
-            a.worker_id
-          ),
-
-          []
-        ),
-
-      amount
+      assignment: publicAssignment(
+        updated,
+        await getProfile(a.user_id),
+        await getProfile(a.worker_id),
+        []
+      ),
+      amount: grossAmount,
+      payment: {
+        grossAmount,
+        commissionPercent: PLATFORM_COMMISSION_PERCENT,
+        commissionAmount,
+        workerAmount
+      }
     });
   }
 
@@ -3613,54 +3624,77 @@ async function api(req, res, u) {
     }
 
     const {
-      data: a
+      data: a,
+      error: assignmentError
     } =
       await supabase
         .from("assignments")
         .select("*")
-        .eq(
-          "id",
-          match[1]
-        )
+        .eq("id", match[1])
         .maybeSingle();
+
+    if (assignmentError) {
+      return json(res, 500, {
+        error: assignmentError.message
+      });
+    }
 
     if (!a) {
       return json(res, 404, {
-        error:
-          "Assignment not found."
+        error: "Assignment not found."
       });
     }
 
-    if (
-      a.user_id !==
-      user.id
-    ) {
+    if (a.user_id !== user.id) {
       return json(res, 403, {
-        error:
-          "Only the assignment poster can pay the final amount."
+        error: "Only the assignment poster can pay the final amount."
       });
     }
 
-    if (
-      a.status !==
-      "approved_payment_due"
-    ) {
+    if (a.status !== "approved_payment_due") {
       return json(res, 409, {
-        error:
-          "Approve the final submission first."
+        error: "Approve the final submission first."
       });
     }
 
-    const amount =
-      a.budget -
-      (
-        a.advance_amount ||
+    if (a.final_paid) {
+      return json(res, 409, {
+        error: "Final payment already paid."
+      });
+    }
+
+    const totalBudget =
+      Math.round(Number(a.budget) * 100) / 100;
+
+    const advanceAmount =
+      Math.round(
+        Number(
+          a.advance_amount ||
+          (Number(a.budget) * Number(a.advance_percent) / 100)
+        ) * 100
+      ) / 100;
+
+    const grossFinalAmount =
+      Math.max(
+        0,
         Math.round(
-          a.budget *
-          a.advance_percent /
-          100
-        )
+          (totalBudget - advanceAmount) * 100
+        ) / 100
       );
+
+    const commissionAmount =
+      Math.round(
+        grossFinalAmount *
+        PLATFORM_COMMISSION_PERCENT /
+        100 *
+        100
+      ) / 100;
+
+    const workerAmount =
+      Math.round(
+        (grossFinalAmount - commissionAmount) *
+        100
+      ) / 100;
 
     const {
       data: updated,
@@ -3669,104 +3703,77 @@ async function api(req, res, u) {
       await supabase
         .from("assignments")
         .update({
-          final_paid:
-            true,
-
-          final_paid_at:
-            now(),
-
-          final_amount:
-            amount,
-
-          status:
-            "completed"
+          final_paid: true,
+          final_paid_at: now(),
+          final_amount: grossFinalAmount,
+          status: "completed"
         })
-        .eq(
-          "id",
-          a.id
-        )
+        .eq("id", a.id)
         .select("*")
         .single();
 
     if (error) {
       return json(res, 400, {
-        error:
-          error.message
+        error: error.message
+      });
+    }
+
+    const {
+      error: paymentError
+    } =
+      await supabase
+        .from("payments")
+        .insert({
+          assignment_id: a.id,
+          payer_id: user.id,
+          payee_id: a.worker_id,
+          type: "final",
+          amount: workerAmount,
+          status: "paid"
+        });
+
+    if (paymentError) {
+      return json(res, 400, {
+        error: paymentError.message
       });
     }
 
     await supabase
-      .from("payments")
+      .from("assignment_history")
       .insert({
-        assignment_id:
-          a.id,
-
-        payer_id:
-          user.id,
-
-        payee_id:
-          a.worker_id,
-
-        type:
-          "final",
-
-        amount,
-
-        status:
-          "paid"
-      });
-
-    await supabase
-      .from(
-        "assignment_history"
-      )
-      .insert({
-        assignment_id:
-          a.id,
-
-        user_id:
-          user.id,
-
-        type:
-          "final_paid",
-
+        assignment_id: a.id,
+        user_id: user.id,
+        type: "final_paid",
         meta: {
-          amount
+          grossAmount: grossFinalAmount,
+          commissionPercent: PLATFORM_COMMISSION_PERCENT,
+          commissionAmount,
+          workerAmount
         }
       });
 
     await supabase
-      .from(
-        "notifications"
-      )
+      .from("notifications")
       .insert({
-        user_id:
-          a.worker_id,
-
-        type:
-          "payment",
-
-        text:
-          `Final payment of ₹${amount.toLocaleString("en-IN")} paid. Assignment completed: ${a.title}`
+        user_id: a.worker_id,
+        type: "payment",
+        text: `Final payment of ₹${workerAmount.toLocaleString("en-IN")} paid to you. Assignment completed: ${a.title}`
       });
 
     return json(res, 200, {
-      assignment:
-        publicAssignment(
-          updated,
-
-          await getProfile(
-            a.user_id
-          ),
-
-          await getProfile(
-            a.worker_id
-          ),
-
-          []
-        ),
-
-      amount
+      assignment: publicAssignment(
+        updated,
+        await getProfile(a.user_id),
+        await getProfile(a.worker_id),
+        []
+      ),
+      amount: grossFinalAmount,
+      payment: {
+        grossAmount: grossFinalAmount,
+        commissionPercent: PLATFORM_COMMISSION_PERCENT,
+        commissionAmount,
+        workerAmount
+      }
     });
   }
 
