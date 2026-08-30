@@ -1314,6 +1314,7 @@ select{
 }
 
 </style>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 
 <body>
@@ -5706,11 +5707,186 @@ async function acceptAssignment(id){
 
 async function payAdvance(id){
 
-  await assignmentAction(
-    id,
-    "advance",
-    "Pay the agreed advance now?"
-  );
+  try{
+
+    if(
+      typeof Razorpay === "undefined"
+    ){
+
+      toast(
+        "Payment system is not loaded. Please refresh the page.",
+        false
+      );
+
+      return;
+
+    }
+
+    const order =
+      await api(
+        "/assignments/" +
+        id +
+        "/advance",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          }
+        }
+      );
+
+    if(
+      !order ||
+      !order.orderId ||
+      !order.keyId
+    ){
+
+      throw new Error(
+        order?.error ||
+        "Could not create payment order."
+      );
+
+    }
+
+    const options = {
+
+      key:
+        order.keyId,
+
+      amount:
+        Number(order.amount) * 100,
+
+      currency:
+        "INR",
+
+      name:
+        "VENZNOVA",
+
+      description:
+        "Assignment advance payment",
+
+      order_id:
+        order.orderId,
+
+      handler:
+        async function(response){
+
+          try{
+
+            const result =
+              await api(
+                "/assignments/" +
+                id +
+                "/advance/verify",
+                {
+
+                  method: "POST",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+
+                  body:
+                    JSON.stringify({
+
+                      razorpay_payment_id:
+                        response.razorpay_payment_id,
+
+                      razorpay_order_id:
+                        response.razorpay_order_id,
+
+                      razorpay_signature:
+                        response.razorpay_signature
+
+                    })
+
+                }
+              );
+
+            if(
+              !result.success
+            ){
+
+              throw new Error(
+                result.error ||
+                "Payment verification failed."
+              );
+
+            }
+
+            toast(
+              "Advance payment successful."
+            );
+
+            await loadAssignments();
+
+          }catch(error){
+
+            toast(
+              error.message ||
+              "Payment verification failed.",
+              false
+            );
+
+          }
+
+        },
+
+      modal: {
+
+        ondismiss:
+          function(){
+
+            toast(
+              "Payment cancelled.",
+              false
+            );
+
+          }
+
+      },
+
+      theme: {
+
+        color:
+          "#111111"
+
+      }
+
+    };
+
+    const razorpay =
+      new Razorpay(
+        options
+      );
+
+    razorpay.on(
+      "payment.failed",
+      function(response){
+
+        toast(
+          response?.error?.description ||
+          "Payment failed.",
+          false
+        );
+
+      }
+    );
+
+    razorpay.open();
+
+  }catch(error){
+
+    toast(
+      error.message ||
+      "Could not start payment.",
+      false
+    );
+
+  }
 
 }
 
