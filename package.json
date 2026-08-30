@@ -1,7 +1,7 @@
 {
   "name": "venz-nova-nift-connect",
   "version": "2.0.0",
-  "description": "VENZNOVA NIFT/CONNECT - zero-dependency functional website",
+  "description": "VENZNOVA NIFT/CONNECT",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "razorpay": "^2.9.8"
   }
 }
