@@ -1717,6 +1717,35 @@ async function api(req, res, u) {
   }
 
   /* =======================================================
+     PROJECT DELETE
+  ======================================================= */
+
+  match = p.match(/^\/api\/projects\/([^/]+)$/);
+  if (match && method === "DELETE") {
+    if (!requireUser(user, res)) return;
+
+    const { data: project, error: findError } = await supabase
+      .from("projects")
+      .select("id,user_id,file_url")
+      .eq("id", match[1])
+      .maybeSingle();
+
+    if (findError) return json(res, 400, { error: findError.message });
+    if (!project) return json(res, 404, { error: "Project not found." });
+    if (project.user_id !== user.id) return json(res, 403, { error: "You can delete only your own project." });
+
+    const { error } = await supabase.from("projects").delete().eq("id", project.id);
+    if (error) return json(res, 400, { error: error.message });
+
+    if (project.file_url && String(project.file_url).startsWith("/uploads/")) {
+      const filePath = path.join(UPLOADS, path.basename(project.file_url));
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    }
+
+    return json(res, 200, { ok: true });
+  }
+
+  /* =======================================================
      PROJECT LIKE
   ======================================================= */
 
@@ -1902,7 +1931,7 @@ async function api(req, res, u) {
         .map(
           x =>
             publicDoubt(
-              x,
+              { ...x, description: x.description ?? x.body },
               map.get(
                 x.user_id
               ),
@@ -1989,7 +2018,7 @@ async function api(req, res, u) {
               body.title
             ).trim(),
 
-          description:
+          body:
             String(
               body.description
             ).trim(),
@@ -2022,6 +2051,23 @@ async function api(req, res, u) {
           []
         )
     });
+  }
+
+  /* =======================================================
+     DOUBT DELETE
+  ======================================================= */
+
+  match = p.match(/^\/api\/doubts\/([^/]+)$/);
+  if (match && method === "DELETE") {
+    if (!requireUser(user, res)) return;
+    const { data: doubt, error: findError } = await supabase
+      .from("doubts").select("id,user_id,file_url").eq("id", match[1]).maybeSingle();
+    if (findError) return json(res, 400, { error: findError.message });
+    if (!doubt) return json(res, 404, { error: "Doubt not found." });
+    if (doubt.user_id !== user.id) return json(res, 403, { error: "You can delete only your own doubt." });
+    const { error } = await supabase.from("doubts").delete().eq("id", doubt.id);
+    if (error) return json(res, 400, { error: error.message });
+    return json(res, 200, { ok: true });
   }
 
   /* =======================================================
@@ -2750,6 +2796,27 @@ async function api(req, res, u) {
           []
         )
     });
+  }
+
+  /* =======================================================
+     ASSIGNMENT DELETE
+  ======================================================= */
+
+  match = p.match(/^\/api\/assignments\/([^/]+)$/);
+  if (match && method === "DELETE") {
+    if (!requireUser(user, res)) return;
+    const { data: assignment, error: findError } = await supabase
+      .from("assignments").select("id,user_id,assignment_file_url").eq("id", match[1]).maybeSingle();
+    if (findError) return json(res, 400, { error: findError.message });
+    if (!assignment) return json(res, 404, { error: "Assignment not found." });
+    if (assignment.user_id !== user.id) return json(res, 403, { error: "You can delete only your own assignment." });
+    const { error } = await supabase.from("assignments").delete().eq("id", assignment.id);
+    if (error) return json(res, 400, { error: error.message });
+    if (assignment.assignment_file_url && String(assignment.assignment_file_url).startsWith("/uploads/")) {
+      const filePath = path.join(UPLOADS, path.basename(assignment.assignment_file_url));
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    }
+    return json(res, 200, { ok: true });
   }
 
   /* =======================================================
