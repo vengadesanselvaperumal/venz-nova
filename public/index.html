@@ -1330,6 +1330,491 @@ body{background:#f7f7fb;color:var(--text);font-family:Inter,ui-sans-serif,system
 @media(max-width:900px){.topbar{height:60px}.nav{padding:0 14px}.navlinks,.nav-actions .btn{display:none}.mobile-toggle{display:grid!important}.mobile-menu{position:fixed;display:none;top:60px;left:10px;right:10px;z-index:50;background:#11101e;border:1px solid #2e293d;border-radius:14px;padding:10px;box-shadow:0 20px 50px rgba(0,0,0,.35)}.mobile-menu.open{display:block}.mobile-menu a,.mobile-menu button{display:block;width:100%;padding:13px;border:0;background:transparent;color:#fff;text-align:left;text-decoration:none;border-radius:9px}.mobile-menu a:hover,.mobile-menu button:hover{background:#211a31}.page{padding:0 12px}.hero{grid-template-columns:1fr;min-height:auto;padding:32px 22px}.hero h1{font-size:42px}.orbit{min-height:260px}.orbit:before{width:310px;height:190px}.grid3{grid-template-columns:1fr}.home-dash{grid-template-columns:1fr}.home-side{display:none}.metric-row{grid-template-columns:repeat(2,1fr)}.footer-inner{grid-template-columns:1fr 1fr}.page-title{padding-top:18px}}
 @media(max-width:560px){.brand-name strong{font-size:13px}.brand small{font-size:6px}.hero h1{font-size:35px;letter-spacing:-1.5px}.hero .lead{font-size:13px}.hero-actions{flex-direction:column}.orbit{min-height:220px}.orbit:before{width:270px;height:155px}.orbit .core{width:170px;height:120px}.orbit .v{font-size:55px}.float{font-size:9px}.f1{top:5px}.f2{left:0;bottom:8px}.f3{right:0;bottom:10px}.metric-row{grid-template-columns:1fr 1fr}.footer-inner{grid-template-columns:1fr}.cards{grid-template-columns:1fr!important}.formgrid{grid-template-columns:1fr!important}.chat{grid-template-columns:1fr!important}.chat-side{max-height:220px}}
 
+
+
+/* =========================================================
+   VENZNOVA FASHION-TECH INTERACTION LAYER
+   Visual upgrade only — existing template + API logic preserved.
+========================================================= */
+:root{
+  --vn-navy:#070b18;
+  --vn-navy2:#0d1230;
+  --vn-pink:#ff2fa7;
+  --vn-purple:#8d5cff;
+  --vn-blue:#35c8ff;
+  --vn-white:#f8f8ff;
+  --vn-glass:rgba(255,255,255,.055);
+  --vn-glass2:rgba(255,255,255,.085);
+}
+
+body{
+  overflow-x:hidden;
+  background:
+    radial-gradient(900px 500px at 7% 5%,rgba(255,47,167,.16),transparent 62%),
+    radial-gradient(800px 520px at 95% 20%,rgba(141,92,255,.15),transparent 60%),
+    radial-gradient(700px 500px at 50% 100%,rgba(53,200,255,.08),transparent 65%),
+    linear-gradient(135deg,#050711 0%,#080c1c 42%,#0a0715 100%);
+}
+
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  opacity:.18;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:46px 46px;
+  mask-image:linear-gradient(to bottom,black,transparent 85%);
+}
+
+body::after{
+  content:"";
+  position:fixed;
+  width:520px;
+  height:520px;
+  left:50%;
+  top:40%;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  z-index:0;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,47,167,.055),transparent 68%);
+  filter:blur(18px);
+  animation:vn-breathe 8s ease-in-out infinite;
+}
+
+.app,.topbar,.footer{position:relative;z-index:1}
+
+.topbar{
+  background:rgba(5,7,17,.72)!important;
+  border-bottom:1px solid rgba(255,255,255,.09)!important;
+  box-shadow:0 12px 50px rgba(0,0,0,.18);
+}
+
+.topbar::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--vn-pink),var(--vn-purple),transparent);
+  opacity:.65;
+}
+
+.brandmark{
+  position:relative;
+  background:linear-gradient(135deg,var(--vn-pink),var(--vn-purple))!important;
+  box-shadow:0 0 28px rgba(255,47,167,.28),inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;
+}
+.brand:hover .brandmark{transform:rotate(-7deg) scale(1.08)}
+
+.brand-name strong{
+  background:linear-gradient(90deg,#fff 15%,#ffb4df 55%,#b9a2ff 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent!important;
+}
+
+.navlinks a{
+  position:relative;
+  transition:color .25s,transform .25s;
+}
+.navlinks a::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  right:50%;
+  bottom:-9px;
+  height:2px;
+  border-radius:9px;
+  background:linear-gradient(90deg,var(--vn-pink),var(--vn-purple));
+  transition:left .25s,right .25s;
+}
+.navlinks a:hover{transform:translateY(-1px);color:#fff!important}
+.navlinks a:hover::after{left:10%;right:10%}
+
+.page,.section,.hero,.home-dash,.card,.feature,.profile-card,.assignment-card,.modal,.auth-copy,.chat,.noticebox{position:relative}
+
+.page::before{
+  content:"";
+  position:absolute;
+  width:260px;
+  height:260px;
+  top:20px;
+  right:-130px;
+  border:1px solid rgba(255,47,167,.12);
+  border-radius:50%;
+  box-shadow:0 0 0 22px rgba(141,92,255,.025),0 0 0 46px rgba(53,200,255,.018);
+  pointer-events:none;
+}
+
+.hero{
+  isolation:isolate;
+  overflow:hidden;
+  background:
+    linear-gradient(120deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),
+    radial-gradient(circle at 76% 22%,rgba(255,47,167,.18),transparent 30%),
+    radial-gradient(circle at 93% 80%,rgba(141,92,255,.16),transparent 33%)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 28px 80px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.hero::before{
+  content:"";
+  position:absolute;
+  inset:-30% -10%;
+  background:
+    repeating-linear-gradient(112deg,transparent 0 44px,rgba(255,255,255,.035) 45px,transparent 46px 92px);
+  transform:rotate(-7deg);
+  pointer-events:none;
+  opacity:.55;
+}
+
+.hero::after{
+  content:"VN / 01";
+  position:absolute;
+  right:28px;
+  top:22px;
+  font-size:11px;
+  letter-spacing:.28em;
+  color:rgba(255,255,255,.38);
+  font-weight:800;
+  pointer-events:none;
+}
+
+.eyebrow,.kicker{
+  letter-spacing:.18em!important;
+  text-transform:uppercase;
+}
+
+.hero h1,.page-title{
+  text-wrap:balance;
+  letter-spacing:-.035em;
+}
+
+.hero h1{
+  background:linear-gradient(110deg,#fff 15%,#ffd5ee 46%,#c5b8ff 76%,#fff 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  background-size:220% auto;
+  animation:vn-shimmer 7s linear infinite;
+}
+
+.btn{
+  position:relative;
+  overflow:hidden;
+  border-radius:13px!important;
+  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease!important;
+}
+.btn::before{
+  content:"";
+  position:absolute;
+  top:-80%;
+  left:-35%;
+  width:25%;
+  height:260%;
+  transform:rotate(24deg) translateX(-220%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.48),transparent);
+  transition:transform .65s ease;
+  pointer-events:none;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.25)!important}
+.btn:hover::before{transform:rotate(24deg) translateX(620%)}
+.btn.primary{
+  background:linear-gradient(135deg,var(--vn-pink),var(--vn-purple))!important;
+  border-color:transparent!important;
+  box-shadow:0 8px 28px rgba(255,47,167,.22);
+}
+
+.card,.feature,.profile-card,.assignment-card,.home-dash,.chat,.noticebox,.paybox,.filebox{
+  background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025))!important;
+  border-color:rgba(255,255,255,.09)!important;
+  box-shadow:0 18px 55px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.045);
+  backdrop-filter:blur(14px);
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s,border-color .35s,background .35s;
+}
+
+.card:hover,.feature:hover,.profile-card:hover,.assignment-card:hover{
+  border-color:rgba(255,47,167,.28)!important;
+  box-shadow:0 25px 70px rgba(0,0,0,.25),0 0 0 1px rgba(255,47,167,.04),inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.card::after,.feature::after,.profile-card::after,.assignment-card::after{
+  content:"";
+  position:absolute;
+  width:120px;
+  height:120px;
+  right:-70px;
+  bottom:-70px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,47,167,.12),transparent 68%);
+  pointer-events:none;
+  transition:transform .4s ease;
+}
+.card:hover::after,.feature:hover::after,.profile-card:hover::after,.assignment-card:hover::after{transform:scale(1.7)}
+
+.metric,.stat{
+  border-color:rgba(255,255,255,.08)!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.02))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+.metric strong,.stat strong,.money{
+  background:linear-gradient(90deg,#fff,#ff9bd4,#b7a5ff);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent!important;
+}
+
+.input,.select,textarea,input,select{
+  transition:border-color .22s,box-shadow .22s,background .22s,transform .22s;
+}
+.input:focus,.select:focus,textarea:focus,input:focus,select:focus{
+  border-color:rgba(255,47,167,.65)!important;
+  box-shadow:0 0 0 4px rgba(255,47,167,.09),0 12px 30px rgba(0,0,0,.14)!important;
+  outline:none;
+}
+
+.tag{border-color:rgba(255,255,255,.12)!important}
+.link{color:#ff77c2!important}
+
+.footer{
+  background:linear-gradient(180deg,rgba(8,10,22,.2),rgba(4,5,12,.92))!important;
+  border-top:1px solid rgba(255,255,255,.08)!important;
+  overflow:hidden;
+}
+.footer::before{
+  content:"";
+  position:absolute;
+  width:500px;height:200px;
+  left:50%;top:-150px;
+  transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(255,47,167,.14),transparent 70%);
+  pointer-events:none;
+}
+
+/* animated decorative floating objects */
+.vn-orb,.vn-line,.vn-cursor,.vn-cursor-ring,.vn-progress{position:fixed;pointer-events:none}
+.vn-orb{z-index:0;border-radius:50%;filter:blur(.2px);opacity:.55;mix-blend-mode:screen}
+.vn-orb.one{width:10px;height:10px;background:#ff4aae;left:8%;top:38%;box-shadow:0 0 35px #ff4aae;animation:vn-float 7s ease-in-out infinite}
+.vn-orb.two{width:7px;height:7px;background:#8d5cff;right:12%;top:28%;box-shadow:0 0 30px #8d5cff;animation:vn-float 9s ease-in-out infinite reverse}
+.vn-orb.three{width:5px;height:5px;background:#35c8ff;left:45%;bottom:18%;box-shadow:0 0 28px #35c8ff;animation:vn-float 11s ease-in-out infinite}
+
+.vn-progress{z-index:999;left:0;top:0;height:2px;width:0;background:linear-gradient(90deg,var(--vn-pink),var(--vn-purple),var(--vn-blue));box-shadow:0 0 14px rgba(255,47,167,.65);transition:width .08s linear}
+
+.vn-cursor{z-index:9999;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;box-shadow:0 0 18px rgba(255,47,167,.9)}
+.vn-cursor-ring{z-index:9998;width:34px;height:34px;margin:-17px 0 0 -17px;border:1px solid rgba(255,110,196,.65);border-radius:50%;transition:width .18s,height .18s,margin .18s,border-color .18s,transform .08s}
+body.vn-hover .vn-cursor-ring{width:52px;height:52px;margin:-26px 0 0 -26px;border-color:rgba(141,92,255,.9)}
+
+.vn-reveal{opacity:0;transform:translateY(18px);transition:opacity .65s ease,transform .65s cubic-bezier(.2,.8,.2,1)}
+.vn-reveal.vn-visible{opacity:1;transform:none}
+
+.vn-spotlight{
+  position:absolute!important;
+  width:280px;height:280px;
+  border-radius:50%;
+  pointer-events:none;
+  background:radial-gradient(circle,rgba(255,47,167,.10),transparent 67%);
+  transform:translate(-50%,-50%);
+  opacity:0;
+  transition:opacity .25s;
+  z-index:0;
+}
+.vn-spotlight.active{opacity:1}
+
+.vn-ripple{
+  position:absolute;
+  width:12px;height:12px;
+  border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);
+  background:rgba(255,255,255,.35);
+  pointer-events:none;
+  animation:vn-ripple .6s ease-out forwards;
+}
+
+@keyframes vn-shimmer{to{background-position:-220% center}}
+@keyframes vn-breathe{0%,100%{transform:translate(-50%,-50%) scale(.85);opacity:.55}50%{transform:translate(-50%,-50%) scale(1.12);opacity:1}}
+@keyframes vn-float{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(20px,-35px,0)}}
+@keyframes vn-ripple{to{transform:translate(-50%,-50%) scale(14);opacity:0}}
+
+@media (max-width:900px){
+  .page::before{display:none}
+  .hero::after{right:16px;top:14px}
+  .card,.feature,.profile-card,.assignment-card{transition:transform .2s ease,box-shadow .25s,border-color .25s}
+}
+
+@media (max-width:700px){
+  body::before{background-size:34px 34px;opacity:.10}
+  body::after{width:320px;height:320px}
+  .vn-cursor,.vn-cursor-ring{display:none}
+  .hero{box-shadow:0 18px 50px rgba(0,0,0,.22)!important}
+  .hero h1{letter-spacing:-.045em}
+  .btn:hover{transform:none}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+  .vn-cursor,.vn-cursor-ring,.vn-orb{display:none}
+}
+
+
+/* =========================================================
+   VENZNOVA // NIFT HYPER-EDITORIAL FASHION SYSTEM
+   Keeps the existing functional template and adds a couture
+   digital layer — transparent, kinetic, editorial, tactile.
+========================================================= */
+:root{
+  --bg:#05050a;
+  --ink:#f8f7f3;
+  --soft:#c9c6ce;
+  --pink:#ff2ea6;
+  --violet:#8c5cff;
+  --electric:#6ee7ff;
+  --acid:#c9ff39;
+  --glass:rgba(255,255,255,.055);
+  --glass2:rgba(255,255,255,.085);
+  --hair:rgba(255,255,255,.12);
+  --shadow:0 30px 100px rgba(0,0,0,.45);
+}
+html{background:var(--bg);}
+body{
+  background:
+    radial-gradient(circle at 14% 8%,rgba(255,46,166,.17),transparent 24%),
+    radial-gradient(circle at 88% 12%,rgba(140,92,255,.18),transparent 24%),
+    radial-gradient(circle at 54% 88%,rgba(110,231,255,.09),transparent 28%),
+    linear-gradient(115deg,#05050a 0%,#08070e 45%,#05050a 100%);
+  overflow-x:hidden;
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9990;opacity:.065;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+  mix-blend-mode:screen;
+}
+body:after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9989;
+  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 4px);
+}
+.topbar{
+  height:82px;background:rgba(5,5,10,.58)!important;border-bottom:1px solid rgba(255,255,255,.11)!important;
+  backdrop-filter:blur(24px) saturate(150%);box-shadow:0 12px 50px rgba(0,0,0,.18);
+}
+.topbar:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--pink),var(--violet),transparent);opacity:.7;}
+.nav{max-width:1380px!important;position:relative;}
+.brandmark{background:conic-gradient(from 220deg,var(--acid),var(--pink),var(--violet),var(--electric),var(--acid))!important;box-shadow:0 0 28px rgba(255,46,166,.3);}
+.brand-name strong{font-family:Georgia,'Times New Roman',serif!important;letter-spacing:1.2px;font-size:18px!important;}
+.navlinks a{border-radius:999px!important;transition:.35s ease!important;position:relative;overflow:hidden;}
+.navlinks a:before{content:"";position:absolute;left:50%;bottom:4px;width:0;height:1px;background:linear-gradient(90deg,var(--pink),var(--electric));transition:.35s;transform:translateX(-50%);}
+.navlinks a:hover:before,.navlinks a.active:before{width:55%;}
+.navlinks a:hover,.navlinks a.active{background:rgba(255,255,255,.06)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 8px 30px rgba(140,92,255,.12);}
+
+/* Editorial framing around the existing sections */
+.hero,.home-dash,.section{
+  position:relative;isolation:isolate;
+  border-color:rgba(255,255,255,.11)!important;
+}
+.hero{overflow:hidden;box-shadow:var(--shadow);}
+.hero:before,.home-dash:before,.section:before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
+  background:
+    linear-gradient(115deg,rgba(255,46,166,.08),transparent 32%,rgba(140,92,255,.07) 68%,transparent),
+    repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,255,255,.025) 83px,transparent 84px);
+}
+.hero:after{
+  content:"NIFT / CONNECT";position:absolute;right:-18px;top:38%;font:700 clamp(44px,8vw,118px)/.8 Georgia,serif;color:transparent;
+  -webkit-text-stroke:1px rgba(255,255,255,.09);transform:rotate(-90deg);letter-spacing:8px;pointer-events:none;
+}
+.hero h1,.hero h2{font-family:Georgia,'Times New Roman',serif!important;letter-spacing:-2px!important;}
+.hero h1{font-size:clamp(48px,7vw,94px)!important;line-height:.91!important;background:linear-gradient(105deg,#fff 18%,#f4d7ea 43%,#b99cff 68%,#fff);-webkit-background-clip:text;background-clip:text;color:transparent!important;}
+.hero h1 em,.hero .accent{color:var(--pink)!important;}
+
+/* Floating editorial index marks */
+.hero .eyebrow:before,.section .eyebrow:before{content:"01";display:inline-block;margin-right:12px;color:var(--acid);font:700 10px/1 Inter,sans-serif;letter-spacing:2px;}
+.section .eyebrow:before{content:"02";}
+
+/* Cards: no heavy solids — translucent fashion objects */
+.card,.panel,.stat,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card,.message-card,.home-dash>*{
+  background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025))!important;
+  border:1px solid rgba(255,255,255,.13)!important;
+  box-shadow:0 20px 70px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08)!important;
+  backdrop-filter:blur(18px) saturate(135%);
+}
+.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card{position:relative;overflow:hidden;transition:transform .45s cubic-bezier(.2,.75,.2,1),border-color .35s,box-shadow .45s;}
+.card:before,.project-card:before,.opportunity-card:before,.assignment-card:before,.doubt-card:before,.user-card:before{
+  content:"";position:absolute;inset:-1px;pointer-events:none;opacity:0;transition:.4s;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,46,166,.18),transparent 34%);
+}
+.card:hover,.project-card:hover,.opportunity-card:hover,.assignment-card:hover,.doubt-card:hover,.user-card:hover{
+  transform:translateY(-8px) rotateX(1deg);border-color:rgba(255,46,166,.36)!important;
+  box-shadow:0 30px 100px rgba(0,0,0,.4),0 0 50px rgba(140,92,255,.1)!important;
+}
+.card:hover:before,.project-card:hover:before,.opportunity-card:hover:before,.assignment-card:hover:before,.doubt-card:hover:before,.user-card:hover:before{opacity:1;}
+
+/* Pills and buttons become couture UI objects */
+.btn,.tab,button{
+  border-radius:999px!important;transition:transform .25s ease,box-shadow .3s ease,background .3s ease,border-color .3s ease!important;
+}
+.btn:hover,button:hover{transform:translateY(-2px);box-shadow:0 12px 38px rgba(255,46,166,.18)!important;}
+.btn.primary,.btn-primary{
+  background:linear-gradient(110deg,var(--pink),var(--violet),#5d7cff)!important;
+  border:1px solid rgba(255,255,255,.25)!important;box-shadow:0 12px 35px rgba(255,46,166,.2),inset 0 1px rgba(255,255,255,.4)!important;
+}
+input,textarea,select{
+  background:rgba(255,255,255,.045)!important;border:1px solid rgba(255,255,255,.13)!important;color:#fff!important;
+  border-radius:16px!important;backdrop-filter:blur(14px);transition:.3s!important;
+}
+input:focus,textarea:focus,select:focus{border-color:rgba(255,46,166,.55)!important;box-shadow:0 0 0 4px rgba(255,46,166,.08),0 0 40px rgba(140,92,255,.1)!important;outline:none!important;}
+
+/* Fashion runway marquee */
+.vn-runway{width:100%;overflow:hidden;border-block:1px solid rgba(255,255,255,.09);margin:18px 0 34px;position:relative;background:rgba(255,255,255,.018);}
+.vn-runway-track{display:flex;width:max-content;animation:vnMarquee 24s linear infinite;}
+.vn-runway span{padding:14px 28px;font:600 11px/1 Inter,sans-serif;letter-spacing:4px;text-transform:uppercase;color:#aaa6b2;white-space:nowrap;}
+.vn-runway span b{color:var(--pink);font-weight:700;}
+@keyframes vnMarquee{to{transform:translateX(-50%);}}
+
+/* Animated orbital graphic */
+.vn-orbit{position:absolute;width:min(40vw,460px);height:min(40vw,460px);right:-100px;top:5%;border:1px solid rgba(255,46,166,.2);border-radius:50%;pointer-events:none;opacity:.75;}
+.vn-orbit:before,.vn-orbit:after{content:"";position:absolute;inset:12%;border:1px dashed rgba(140,92,255,.32);border-radius:50%;animation:vnSpin 18s linear infinite;}
+.vn-orbit:after{inset:29%;border-color:rgba(110,231,255,.35);animation-duration:11s;animation-direction:reverse;}
+.vn-orbit i{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--pink);box-shadow:0 0 25px var(--pink);left:13%;top:50%;}
+@keyframes vnSpin{to{transform:rotate(360deg);}}
+
+/* Typography becomes editorial instead of dashboard-heavy */
+.section h2,.home-dash h2{font-family:Georgia,'Times New Roman',serif!important;font-weight:500!important;letter-spacing:-1px;}
+.section h2:after,.home-dash h2:after{content:"";display:inline-block;width:38px;height:1px;margin:0 0 8px 12px;background:linear-gradient(90deg,var(--pink),transparent);}
+.muted,.meta,.small{color:#a9a4af!important;}
+
+/* Scroll reveal */
+.vn-reveal{opacity:0;transform:translateY(24px) scale(.985);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1);}
+.vn-reveal.vn-visible{opacity:1;transform:none;}
+
+/* cursor halo */
+.vn-cursor{position:fixed;z-index:10000;width:22px;height:22px;border:1px solid rgba(255,255,255,.65);border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .18s,height .18s,border-color .18s;}
+.vn-cursor-dot{position:fixed;z-index:10001;width:4px;height:4px;background:#fff;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:difference;}
+body.vn-hover .vn-cursor{width:42px;height:42px;border-color:var(--pink);}
+
+/* tiny motion on stat numbers */
+.stat strong,.stat b{background:linear-gradient(120deg,#fff,var(--pink),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+/* Existing footer gets runway treatment */
+.footer{position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,46,166,.035),rgba(140,92,255,.05))!important;border-top:1px solid rgba(255,255,255,.11)!important;}
+.footer:before{content:"VENZNOVA";position:absolute;right:-20px;bottom:-55px;font:900 17vw/.8 Georgia,serif;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.06);pointer-events:none;}
+
+@media(max-width:800px){
+  .topbar{height:70px!important;}
+  .hero h1{font-size:clamp(42px,14vw,72px)!important;}
+  .hero:after{display:none;}
+  .vn-orbit{width:250px;height:250px;right:-120px;top:15%;opacity:.45;}
+  .vn-runway{margin:12px 0 24px;}
+  .vn-runway span{padding:12px 18px;font-size:9px;letter-spacing:3px;}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}}
+
 </style>
 </head>
 
@@ -2123,6 +2608,45 @@ function messages(){
 
 }
 
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+function footer(){
+  return `
+    <footer class="footer">
+      <div class="footer-inner">
+        <div>
+          <div class="brand" style="color:#fff">
+            <span class="brandmark">V</span>
+            <span class="brand-name"><strong style="color:#fff">VENZNOVA</strong><small>NIFT / CONNECT</small></span>
+          </div>
+          <p>Connect. Collaborate. Create Impact. The student ecosystem for NIFTians across campuses and courses.</p>
+        </div>
+        <div>
+          <h4>Explore</h4>
+          <a href="#/marketplace">Marketplace</a>
+          <a href="#/assignments">Assignments</a>
+          <a href="#/opportunities">Opportunities</a>
+        </div>
+        <div>
+          <h4>Community</h4>
+          <a href="#/network">NIFT Network</a>
+          <a href="#/doubts">Doubt Desk</a>
+          <a href="#/messages">Messages</a>
+        </div>
+        <div>
+          <h4>VENZNOVA</h4>
+          <a href="#/dashboard">Dashboard</a>
+          <a href="#/network">Students</a>
+          <a href="#/">Home</a>
+        </div>
+      </div>
+      <div class="footer-bottom">© ${new Date().getFullYear()} VENZNOVA · NIFT / CONNECT</div>
+    </footer>
+  `;
+}
 
 /* =========================================================
    ROUTER
@@ -6466,6 +6990,206 @@ async function loadDashboard(){
 
 }
 
+
+
+/* =========================================================
+   VENZNOVA MICRO-INTERACTIONS
+========================================================= */
+(function(){
+  const boot=()=>{
+    try{
+      // Decorative layers — no libraries, no API changes.
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="vn-progress" id="vnProgress"></div>'+
+        '<div class="vn-orb one"></div><div class="vn-orb two"></div><div class="vn-orb three"></div>'+
+        '<div class="vn-cursor" id="vnCursor"></div><div class="vn-cursor-ring" id="vnCursorRing"></div>'
+      );
+
+      const cursor=document.getElementById('vnCursor');
+      const ring=document.getElementById('vnCursorRing');
+      let mx=-100,my=-100,rx=-100,ry=-100;
+      const finePointer=window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      if(finePointer && cursor && ring){
+        window.addEventListener('pointermove',e=>{
+          mx=e.clientX; my=e.clientY;
+          cursor.style.transform=`translate3d(${mx}px,${my}px,0)`;
+        },{passive:true});
+        const follow=()=>{
+          rx += (mx-rx)*.16; ry += (my-ry)*.16;
+          ring.style.transform=`translate3d(${rx}px,${ry}px,0)`;
+          requestAnimationFrame(follow);
+        };
+        follow();
+        document.addEventListener('mouseover',e=>{
+          if(e.target.closest('a,button,.card,.feature,.profile-card,.assignment-card,.tab')) document.body.classList.add('vn-hover');
+        });
+        document.addEventListener('mouseout',e=>{
+          if(e.target.closest('a,button,.card,.feature,.profile-card,.assignment-card,.tab')) document.body.classList.remove('vn-hover');
+        });
+      }
+
+      const progress=document.getElementById('vnProgress');
+      const updateProgress=()=>{
+        if(!progress)return;
+        const h=document.documentElement.scrollHeight-window.innerHeight;
+        progress.style.width=(h>0?(window.scrollY/h)*100:0)+'%';
+      };
+      window.addEventListener('scroll',updateProgress,{passive:true});
+      updateProgress();
+
+      // Reveal cards as they enter the viewport.
+      const reveal=()=>{
+        const nodes=document.querySelectorAll('.card,.feature,.profile-card,.assignment-card,.metric,.stat,.section,.home-dash');
+        nodes.forEach((el,i)=>{
+          if(!el.classList.contains('vn-reveal')){
+            el.classList.add('vn-reveal');
+            el.style.transitionDelay=Math.min((i%7)*45,270)+'ms';
+          }
+        });
+        if(!('IntersectionObserver' in window)){
+          nodes.forEach(el=>el.classList.add('vn-visible')); return;
+        }
+        if(!window.__vnRevealObserver){
+          window.__vnRevealObserver=new IntersectionObserver(entries=>{
+            entries.forEach(en=>{if(en.isIntersecting){en.target.classList.add('vn-visible');window.__vnRevealObserver.unobserve(en.target)}});
+          },{threshold:.08,rootMargin:'0px 0px -30px 0px'});
+        }
+        document.querySelectorAll('.vn-reveal:not(.vn-visible)').forEach(el=>window.__vnRevealObserver.observe(el));
+      };
+
+      // Subtle 3D tilt on desktop cards.
+      const tilt=()=>{
+        if(!finePointer)return;
+        document.querySelectorAll('.card,.feature,.profile-card,.assignment-card').forEach(el=>{
+          if(el.dataset.vnTilt)return;
+          el.dataset.vnTilt='1';
+          el.addEventListener('pointermove',e=>{
+            const r=el.getBoundingClientRect();
+            const x=(e.clientX-r.left)/r.width-.5;
+            const y=(e.clientY-r.top)/r.height-.5;
+            el.style.transform=`perspective(900px) rotateX(${(-y*2.2).toFixed(2)}deg) rotateY(${(x*2.8).toFixed(2)}deg) translateY(-3px)`;
+          });
+          el.addEventListener('pointerleave',()=>{el.style.transform=''});
+        });
+      };
+
+      // Soft spotlight follows the pointer inside major visual panels.
+      const spotlights=()=>{
+        if(!finePointer)return;
+        document.querySelectorAll('.hero,.home-dash,.section').forEach(el=>{
+          if(el.dataset.vnSpotlight)return;
+          el.dataset.vnSpotlight='1';
+          if(getComputedStyle(el).position==='static')el.style.position='relative';
+          const sp=document.createElement('span');
+          sp.className='vn-spotlight';
+          el.appendChild(sp);
+          el.addEventListener('pointermove',e=>{
+            const r=el.getBoundingClientRect();
+            sp.style.left=(e.clientX-r.left)+'px';
+            sp.style.top=(e.clientY-r.top)+'px';
+            sp.classList.add('active');
+          });
+          el.addEventListener('pointerleave',()=>sp.classList.remove('active'));
+        });
+      };
+
+      // Button / tab ripple.
+      document.addEventListener('click',e=>{
+        const target=e.target.closest('button,.btn,.tab');
+        if(!target)return;
+        const r=target.getBoundingClientRect();
+        const rip=document.createElement('span');
+        rip.className='vn-ripple';
+        rip.style.left=(e.clientX-r.left)+'px';
+        rip.style.top=(e.clientY-r.top)+'px';
+        target.appendChild(rip);
+        setTimeout(()=>rip.remove(),650);
+      });
+
+      // Keyboard shortcut: / focuses the first visible search field.
+      document.addEventListener('keydown',e=>{
+        if(e.key==='/' && !/input|textarea|select/i.test(document.activeElement?.tagName||'')){
+          e.preventDefault();
+          const field=[...document.querySelectorAll('input,textarea')].find(x=>x.offsetParent!==null);
+          if(field)field.focus();
+        }
+      });
+
+      const refresh=()=>{
+        reveal();
+        requestAnimationFrame(()=>{tilt();spotlights()});
+      };
+      refresh();
+
+      // Existing app calls render() when routes change. Wrap it without changing its logic.
+      if(typeof window.render==='function' && !window.__vnRenderWrapped){
+        const originalRender=window.render;
+        window.render=function(){
+          const result=originalRender.apply(this,arguments);
+          setTimeout(refresh,40);
+          return result;
+        };
+        window.__vnRenderWrapped=true;
+      }else{
+        // render is declared in the page script scope; observe DOM changes as a fallback.
+        const mo=new MutationObserver(()=>setTimeout(refresh,30));
+        mo.observe(document.body,{childList:true,subtree:true});
+      }
+    }catch(err){
+      console.warn('VENZNOVA interaction layer skipped:',err);
+    }
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
+
+</script>
+
+
+<script>
+/* VENZNOVA HYPER EDITORIAL MICRO-INTERACTIONS */
+(function(){
+  const fine=matchMedia('(pointer:fine)').matches;
+  function addRunway(){
+    const host=document.querySelector('.hero');
+    if(!host || host.querySelector('.vn-runway')) return;
+    const r=document.createElement('div'); r.className='vn-runway';
+    r.innerHTML='<div class="vn-runway-track">'+Array(2).fill('<span>NIFT <b>×</b> DESIGN</span><span>CONNECT <b>×</b> CREATE</span><span>FASHION <b>×</b> TECHNOLOGY</span><span>PORTFOLIO <b>×</b> COMMUNITY</span><span>IDEATE <b>×</b> COLLABORATE</span>').join('')+'</div>';
+    host.parentNode.insertBefore(r,host.nextSibling);
+  }
+  function addOrbit(){
+    const host=document.querySelector('.hero');
+    if(!host || host.querySelector('.vn-orbit'))return;
+    const o=document.createElement('div');o.className='vn-orbit';o.innerHTML='<i></i>';host.appendChild(o);
+  }
+  function reveal(){
+    document.querySelectorAll('.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card,.section,.home-dash').forEach((el,i)=>{
+      if(el.dataset.vnReveal)return;el.dataset.vnReveal='1';el.classList.add('vn-reveal');
+      setTimeout(()=>el.classList.add('vn-visible'),Math.min(i*45,420));
+    });
+  }
+  function cursor(){
+    if(!fine || document.querySelector('.vn-cursor'))return;
+    const c=document.createElement('div'),d=document.createElement('div');c.className='vn-cursor';d.className='vn-cursor-dot';document.body.append(c,d);
+    let x=innerWidth/2,y=innerHeight/2,tx=x,ty=y;
+    addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;});
+    (function loop(){x+=(tx-x)*.2;y+=(ty-y)*.2;c.style.left=x+'px';c.style.top=y+'px';d.style.left=tx+'px';d.style.top=ty+'px';requestAnimationFrame(loop)})();
+    document.addEventListener('pointerover',e=>{if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.user-card'))document.body.classList.add('vn-hover')});
+    document.addEventListener('pointerout',e=>{if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.user-card'))document.body.classList.remove('vn-hover')});
+  }
+  function cardLight(){
+    if(!fine)return;
+    document.addEventListener('pointermove',e=>{
+      const el=e.target.closest('.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card');if(!el)return;
+      const r=el.getBoundingClientRect();el.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');el.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+    });
+  }
+  function boot(){
+    addRunway();addOrbit();reveal();cursor();cardLight();
+    const obs=new MutationObserver(()=>{addRunway();addOrbit();reveal()});
+    obs.observe(document.body,{childList:true,subtree:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
 </script>
 
 </body>
