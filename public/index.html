@@ -1692,17 +1692,17 @@ body{
   overflow-x:hidden;
 }
 body:before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:9990;opacity:.065;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
-  mix-blend-mode:screen;
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9990;opacity:.035;
+  background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.16) 0 1px,transparent 1px);
+  background-size:7px 7px;
 }
 body:after{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:9989;
-  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 4px);
+  background:linear-gradient(180deg,transparent 0%,rgba(255,255,255,.008) 50%,transparent 100%);
 }
 .topbar{
   height:82px;background:rgba(5,5,10,.58)!important;border-bottom:1px solid rgba(255,255,255,.11)!important;
-  backdrop-filter:blur(24px) saturate(150%);box-shadow:0 12px 50px rgba(0,0,0,.18);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 12px 50px rgba(0,0,0,.18);
 }
 .topbar:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--pink),var(--violet),transparent);opacity:.7;}
 .nav{max-width:1380px!important;position:relative;}
@@ -1816,6 +1816,24 @@ body.vn-hover .vn-cursor{width:42px;height:42px;border-color:var(--pink);}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}}
 
 </style>
+
+<style id="vn-performance">
+  /* NIFT hyper look, but GPU-friendly. Avoid huge blur surfaces. */
+  .nav{backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important}
+  .card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card,.feature,.profile-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+  .vn-cursor,.vn-cursor-dot,.vn-progress{will-change:transform}
+  .vn-orbit{pointer-events:none;will-change:transform}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+  }
+  @media (max-width:900px){
+    .vn-cursor,.vn-cursor-dot,.vn-orb{display:none!important}
+    .hero{min-height:360px}
+  }
+</style>
+<style id="vn-boot">
+.vn-boot-screen{min-height:100vh;display:grid;place-content:center;justify-items:center;gap:10px;background:radial-gradient(circle at 50% 40%,rgba(255,45,160,.13),transparent 30%),#05050a;color:#fff}.vn-boot-mark{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;font:900 32px Georgia,serif;background:linear-gradient(135deg,#ff2da0,#8d5cff);box-shadow:0 0 50px rgba(255,45,160,.28)}.vn-boot-word{font:800 18px Georgia,serif;letter-spacing:3px}.vn-boot-line{width:130px;height:1px;background:rgba(255,255,255,.12);overflow:hidden}.vn-boot-line span{display:block;width:45%;height:100%;background:linear-gradient(90deg,#ff2da0,#8d5cff);animation:vnBoot 1.3s ease-in-out infinite}@keyframes vnBoot{0%{transform:translateX(-130%)}100%{transform:translateX(300%)}}.vn-boot-screen small{font:10px system-ui;letter-spacing:2px;color:#8d98a9}
+</style>
 </head>
 
 <body>
@@ -1905,58 +1923,40 @@ function toast(message, ok = true){
 
 const api = async(path,opt={}) => {
 
-  // Always use the newest token available.
-  // state.token is checked first, then localStorage.
-  const token =
-    state.token ||
-    localStorage.getItem("vn_token") ||
-    "";
+  const token = state.token || localStorage.getItem("vn_token") || "";
+  const headers = {...(opt.headers || {})};
+  if(token) headers.Authorization = "Bearer " + token;
 
-  const headers = {
-    ...(opt.headers || {})
-  };
-
-  // Send the login token to every protected API request.
-  if(token){
-    headers.Authorization =
-      "Bearer " + token;
-  }
-
-  const response = await fetch(
-    "/api" + path,
-    {
-      ...opt,
-      headers,
-      credentials: "same-origin"
-    }
-  );
-
-  let data = {};
+  const controller = new AbortController();
+  const timeout = Number(opt.timeout || 12000);
+  const timer = setTimeout(() => controller.abort(), timeout);
 
   try{
-    data = await response.json();
-  }catch{}
+    const response = await fetch("/api" + path,{
+      ...opt,
+      headers,
+      credentials:"same-origin",
+      signal:controller.signal
+    });
 
-  // A 401 means the saved session is no longer valid.
-  if(response.status === 401){
-    state.token = "";
-    state.user = null;
-    localStorage.removeItem("vn_token");
+    let data={};
+    try{ data=await response.json(); }catch{}
 
-    throw new Error(
-      data.error ||
-      "Login required."
-    );
+    if(response.status===401){
+      state.token="";
+      state.user=null;
+      localStorage.removeItem("vn_token");
+      throw new Error(data.error || "Login required.");
+    }
+
+    if(!response.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }catch(error){
+    if(error?.name === "AbortError") throw new Error("Server is taking too long. Please try again.");
+    throw error;
+  }finally{
+    clearTimeout(timer);
   }
-
-  if(!response.ok){
-    throw new Error(
-      data.error ||
-      "Request failed"
-    );
-  }
-
-  return data;
 };
 
 
@@ -2749,31 +2749,23 @@ window.addEventListener(
 
 window.addEventListener(
   "DOMContentLoaded",
-  async() => {
-
-    if(state.token){
-
-      try{
-
-        state.user =
-          (
-            await api("/me")
-          ).user;
-
-      }catch{
-
-        state.token = "";
-
-        localStorage.removeItem(
-          "vn_token"
-        );
-
-      }
-
-    }
-
+  () => {
+    // Render the interface immediately. Never block the first paint on /api/me.
     render();
 
+    if(state.token){
+      api("/me", {timeout:6000})
+        .then(data => {
+          state.user = data.user;
+          render();
+        })
+        .catch(() => {
+          state.token = "";
+          localStorage.removeItem("vn_token");
+          state.user = null;
+          render();
+        });
+    }
   }
 );
 
@@ -6993,204 +6985,123 @@ async function loadDashboard(){
 
 
 /* =========================================================
-   VENZNOVA MICRO-INTERACTIONS
+   VENZNOVA NIFT HYPER — LIGHTWEIGHT MICRO-INTERACTIONS
+   Performance-first: one cursor loop, no MutationObserver,
+   no per-card pointer listeners, no duplicate effects.
 ========================================================= */
 (function(){
   const boot=()=>{
     try{
-      // Decorative layers — no libraries, no API changes.
-      document.body.insertAdjacentHTML('afterbegin',
-        '<div class="vn-progress" id="vnProgress"></div>'+
-        '<div class="vn-orb one"></div><div class="vn-orb two"></div><div class="vn-orb three"></div>'+
-        '<div class="vn-cursor" id="vnCursor"></div><div class="vn-cursor-ring" id="vnCursorRing"></div>'
-      );
+      const fine=window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      const body=document.body;
 
-      const cursor=document.getElementById('vnCursor');
-      const ring=document.getElementById('vnCursorRing');
-      let mx=-100,my=-100,rx=-100,ry=-100;
-      const finePointer=window.matchMedia && window.matchMedia('(pointer:fine)').matches;
-      if(finePointer && cursor && ring){
-        window.addEventListener('pointermove',e=>{
-          mx=e.clientX; my=e.clientY;
-          cursor.style.transform=`translate3d(${mx}px,${my}px,0)`;
-        },{passive:true});
-        const follow=()=>{
-          rx += (mx-rx)*.16; ry += (my-ry)*.16;
-          ring.style.transform=`translate3d(${rx}px,${ry}px,0)`;
-          requestAnimationFrame(follow);
-        };
-        follow();
-        document.addEventListener('mouseover',e=>{
-          if(e.target.closest('a,button,.card,.feature,.profile-card,.assignment-card,.tab')) document.body.classList.add('vn-hover');
-        });
-        document.addEventListener('mouseout',e=>{
-          if(e.target.closest('a,button,.card,.feature,.profile-card,.assignment-card,.tab')) document.body.classList.remove('vn-hover');
-        });
+      if(!document.getElementById('vnProgress')){
+        body.insertAdjacentHTML('afterbegin','<div class="vn-progress" id="vnProgress"></div>');
       }
 
       const progress=document.getElementById('vnProgress');
       const updateProgress=()=>{
-        if(!progress)return;
         const h=document.documentElement.scrollHeight-window.innerHeight;
-        progress.style.width=(h>0?(window.scrollY/h)*100:0)+'%';
+        if(progress) progress.style.width=(h>0?(window.scrollY/h)*100:0)+'%';
       };
       window.addEventListener('scroll',updateProgress,{passive:true});
       updateProgress();
 
-      // Reveal cards as they enter the viewport.
+      // Only one cursor animation loop on desktop.
+      if(fine && !document.getElementById('vnCursor')){
+        body.insertAdjacentHTML('beforeend','<div class="vn-cursor" id="vnCursor"></div><div class="vn-cursor-dot" id="vnCursorDot"></div>');
+        const c=document.getElementById('vnCursor');
+        const d=document.getElementById('vnCursorDot');
+        let x=innerWidth/2,y=innerHeight/2,tx=x,ty=y;
+        window.addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;},{passive:true});
+        const loop=()=>{
+          x+=(tx-x)*.16; y+=(ty-y)*.16;
+          c.style.transform=`translate3d(${x}px,${y}px,0)`;
+          d.style.transform=`translate3d(${tx}px,${ty}px,0)`;
+          requestAnimationFrame(loop);
+        };
+        loop();
+        document.addEventListener('pointerover',e=>{
+          if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card')) body.classList.add('vn-hover');
+        },{passive:true});
+        document.addEventListener('pointerout',e=>{
+          if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card')) body.classList.remove('vn-hover');
+        },{passive:true});
+      }
+
+      // Lightweight pointer lighting using CSS variables; one delegated listener.
+      if(fine && !window.__vnLight){
+        window.__vnLight=true;
+        document.addEventListener('pointermove',e=>{
+          const el=e.target.closest('.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card');
+          if(!el)return;
+          const r=el.getBoundingClientRect();
+          el.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+          el.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+        },{passive:true});
+      }
+
+      // Reveal only the elements currently in the DOM. No observer.
       const reveal=()=>{
-        const nodes=document.querySelectorAll('.card,.feature,.profile-card,.assignment-card,.metric,.stat,.section,.home-dash');
-        nodes.forEach((el,i)=>{
-          if(!el.classList.contains('vn-reveal')){
-            el.classList.add('vn-reveal');
-            el.style.transitionDelay=Math.min((i%7)*45,270)+'ms';
+        document.querySelectorAll('.card,.feature,.profile-card,.assignment-card,.metric,.stat,.section,.home-dash,.project-card,.opportunity-card,.doubt-card,.user-card').forEach((el,i)=>{
+          if(el.dataset.vnReady)return;
+          el.dataset.vnReady='1';
+          el.classList.add('vn-reveal');
+          el.style.transitionDelay=Math.min((i%5)*35,140)+'ms';
+          requestAnimationFrame(()=>el.classList.add('vn-visible'));
+        });
+      };
+
+      // Runway graphic is static after insertion — no animation loop in JS.
+      const hero=document.querySelector('.hero');
+      if(hero && !hero.querySelector('.vn-orbit')){
+        const o=document.createElement('div');
+        o.className='vn-orbit';
+        o.innerHTML='<i></i>';
+        hero.appendChild(o);
+      }
+
+      reveal();
+      window.addEventListener('hashchange',()=>setTimeout(reveal,0),{passive:true});
+
+      // Ripple is event-delegated and tiny.
+      if(!window.__vnRipple){
+        window.__vnRipple=true;
+        document.addEventListener('click',e=>{
+          const target=e.target.closest('button,.btn,.tab');
+          if(!target)return;
+          const r=target.getBoundingClientRect();
+          const rip=document.createElement('span');
+          rip.className='vn-ripple';
+          rip.style.left=(e.clientX-r.left)+'px';
+          rip.style.top=(e.clientY-r.top)+'px';
+          target.appendChild(rip);
+          setTimeout(()=>rip.remove(),550);
+        });
+      }
+
+      // Keyboard search shortcut.
+      if(!window.__vnShortcut){
+        window.__vnShortcut=true;
+        document.addEventListener('keydown',e=>{
+          if(e.key==='/' && !/input|textarea|select/i.test(document.activeElement?.tagName||'')){
+            e.preventDefault();
+            const field=[...document.querySelectorAll('input,textarea')].find(x=>x.offsetParent!==null);
+            if(field)field.focus();
           }
         });
-        if(!('IntersectionObserver' in window)){
-          nodes.forEach(el=>el.classList.add('vn-visible')); return;
-        }
-        if(!window.__vnRevealObserver){
-          window.__vnRevealObserver=new IntersectionObserver(entries=>{
-            entries.forEach(en=>{if(en.isIntersecting){en.target.classList.add('vn-visible');window.__vnRevealObserver.unobserve(en.target)}});
-          },{threshold:.08,rootMargin:'0px 0px -30px 0px'});
-        }
-        document.querySelectorAll('.vn-reveal:not(.vn-visible)').forEach(el=>window.__vnRevealObserver.observe(el));
-      };
-
-      // Subtle 3D tilt on desktop cards.
-      const tilt=()=>{
-        if(!finePointer)return;
-        document.querySelectorAll('.card,.feature,.profile-card,.assignment-card').forEach(el=>{
-          if(el.dataset.vnTilt)return;
-          el.dataset.vnTilt='1';
-          el.addEventListener('pointermove',e=>{
-            const r=el.getBoundingClientRect();
-            const x=(e.clientX-r.left)/r.width-.5;
-            const y=(e.clientY-r.top)/r.height-.5;
-            el.style.transform=`perspective(900px) rotateX(${(-y*2.2).toFixed(2)}deg) rotateY(${(x*2.8).toFixed(2)}deg) translateY(-3px)`;
-          });
-          el.addEventListener('pointerleave',()=>{el.style.transform=''});
-        });
-      };
-
-      // Soft spotlight follows the pointer inside major visual panels.
-      const spotlights=()=>{
-        if(!finePointer)return;
-        document.querySelectorAll('.hero,.home-dash,.section').forEach(el=>{
-          if(el.dataset.vnSpotlight)return;
-          el.dataset.vnSpotlight='1';
-          if(getComputedStyle(el).position==='static')el.style.position='relative';
-          const sp=document.createElement('span');
-          sp.className='vn-spotlight';
-          el.appendChild(sp);
-          el.addEventListener('pointermove',e=>{
-            const r=el.getBoundingClientRect();
-            sp.style.left=(e.clientX-r.left)+'px';
-            sp.style.top=(e.clientY-r.top)+'px';
-            sp.classList.add('active');
-          });
-          el.addEventListener('pointerleave',()=>sp.classList.remove('active'));
-        });
-      };
-
-      // Button / tab ripple.
-      document.addEventListener('click',e=>{
-        const target=e.target.closest('button,.btn,.tab');
-        if(!target)return;
-        const r=target.getBoundingClientRect();
-        const rip=document.createElement('span');
-        rip.className='vn-ripple';
-        rip.style.left=(e.clientX-r.left)+'px';
-        rip.style.top=(e.clientY-r.top)+'px';
-        target.appendChild(rip);
-        setTimeout(()=>rip.remove(),650);
-      });
-
-      // Keyboard shortcut: / focuses the first visible search field.
-      document.addEventListener('keydown',e=>{
-        if(e.key==='/' && !/input|textarea|select/i.test(document.activeElement?.tagName||'')){
-          e.preventDefault();
-          const field=[...document.querySelectorAll('input,textarea')].find(x=>x.offsetParent!==null);
-          if(field)field.focus();
-        }
-      });
-
-      const refresh=()=>{
-        reveal();
-        requestAnimationFrame(()=>{tilt();spotlights()});
-      };
-      refresh();
-
-      // Existing app calls render() when routes change. Wrap it without changing its logic.
-      if(typeof window.render==='function' && !window.__vnRenderWrapped){
-        const originalRender=window.render;
-        window.render=function(){
-          const result=originalRender.apply(this,arguments);
-          setTimeout(refresh,40);
-          return result;
-        };
-        window.__vnRenderWrapped=true;
-      }else{
-        // render is declared in the page script scope; observe DOM changes as a fallback.
-        const mo=new MutationObserver(()=>setTimeout(refresh,30));
-        mo.observe(document.body,{childList:true,subtree:true});
       }
     }catch(err){
       console.warn('VENZNOVA interaction layer skipped:',err);
     }
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-})();
-
-</script>
-
-
-<script>
-/* VENZNOVA HYPER EDITORIAL MICRO-INTERACTIONS */
-(function(){
-  const fine=matchMedia('(pointer:fine)').matches;
-  function addRunway(){
-    const host=document.querySelector('.hero');
-    if(!host || host.querySelector('.vn-runway')) return;
-    const r=document.createElement('div'); r.className='vn-runway';
-    r.innerHTML='<div class="vn-runway-track">'+Array(2).fill('<span>NIFT <b>×</b> DESIGN</span><span>CONNECT <b>×</b> CREATE</span><span>FASHION <b>×</b> TECHNOLOGY</span><span>PORTFOLIO <b>×</b> COMMUNITY</span><span>IDEATE <b>×</b> COLLABORATE</span>').join('')+'</div>';
-    host.parentNode.insertBefore(r,host.nextSibling);
-  }
-  function addOrbit(){
-    const host=document.querySelector('.hero');
-    if(!host || host.querySelector('.vn-orbit'))return;
-    const o=document.createElement('div');o.className='vn-orbit';o.innerHTML='<i></i>';host.appendChild(o);
-  }
-  function reveal(){
-    document.querySelectorAll('.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card,.section,.home-dash').forEach((el,i)=>{
-      if(el.dataset.vnReveal)return;el.dataset.vnReveal='1';el.classList.add('vn-reveal');
-      setTimeout(()=>el.classList.add('vn-visible'),Math.min(i*45,420));
-    });
-  }
-  function cursor(){
-    if(!fine || document.querySelector('.vn-cursor'))return;
-    const c=document.createElement('div'),d=document.createElement('div');c.className='vn-cursor';d.className='vn-cursor-dot';document.body.append(c,d);
-    let x=innerWidth/2,y=innerHeight/2,tx=x,ty=y;
-    addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;});
-    (function loop(){x+=(tx-x)*.2;y+=(ty-y)*.2;c.style.left=x+'px';c.style.top=y+'px';d.style.left=tx+'px';d.style.top=ty+'px';requestAnimationFrame(loop)})();
-    document.addEventListener('pointerover',e=>{if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.user-card'))document.body.classList.add('vn-hover')});
-    document.addEventListener('pointerout',e=>{if(e.target.closest('a,button,input,textarea,select,.card,.project-card,.user-card'))document.body.classList.remove('vn-hover')});
-  }
-  function cardLight(){
-    if(!fine)return;
-    document.addEventListener('pointermove',e=>{
-      const el=e.target.closest('.card,.project-card,.opportunity-card,.assignment-card,.doubt-card,.user-card');if(!el)return;
-      const r=el.getBoundingClientRect();el.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');el.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
-    });
-  }
-  function boot(){
-    addRunway();addOrbit();reveal();cursor();cardLight();
-    const obs=new MutationObserver(()=>{addRunway();addOrbit();reveal()});
-    obs.observe(document.body,{childList:true,subtree:true});
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
 })();
 </script>
+
+
+
 
 </body>
 </html>
