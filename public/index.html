@@ -1834,6 +1834,9 @@ body.vn-hover .vn-cursor{width:42px;height:42px;border-color:var(--pink);}
 <style id="vn-boot">
 .vn-boot-screen{min-height:100vh;display:grid;place-content:center;justify-items:center;gap:10px;background:radial-gradient(circle at 50% 40%,rgba(255,45,160,.13),transparent 30%),#05050a;color:#fff}.vn-boot-mark{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;font:900 32px Georgia,serif;background:linear-gradient(135deg,#ff2da0,#8d5cff);box-shadow:0 0 50px rgba(255,45,160,.28)}.vn-boot-word{font:800 18px Georgia,serif;letter-spacing:3px}.vn-boot-line{width:130px;height:1px;background:rgba(255,255,255,.12);overflow:hidden}.vn-boot-line span{display:block;width:45%;height:100%;background:linear-gradient(90deg,#ff2da0,#8d5cff);animation:vnBoot 1.3s ease-in-out infinite}@keyframes vnBoot{0%{transform:translateX(-130%)}100%{transform:translateX(300%)}}.vn-boot-screen small{font:10px system-ui;letter-spacing:2px;color:#8d98a9}
 </style>
+<style id="vn-safe-boot">
+.vn-safe-boot{min-height:100vh;display:grid;place-content:center;justify-items:center;gap:8px;background:radial-gradient(circle at 50% 42%,rgba(255,47,167,.16),transparent 32%),linear-gradient(135deg,#050711,#080c1c 45%,#0a0715);color:#fff;text-align:center}.vn-safe-v{width:64px;height:64px;border:1px solid rgba(255,255,255,.18);border-radius:20px;display:grid;place-items:center;font:900 36px Georgia,serif;background:linear-gradient(135deg,#ff2fa7,#8d5cff);box-shadow:0 0 55px rgba(255,47,167,.25)}.vn-safe-brand{font:800 18px Georgia,serif;letter-spacing:4px}.vn-safe-sub{font:10px system-ui;letter-spacing:3px;color:#aaa6b7}.vn-safe-bar{width:150px;height:2px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px}.vn-safe-bar i{display:block;width:40%;height:100%;background:linear-gradient(90deg,#ff2fa7,#8d5cff,#35c8ff);animation:vnSafe 1.2s ease-in-out infinite}@keyframes vnSafe{0%{transform:translateX(-160%)}100%{transform:translateX(420%)}}.vn-safe-boot small{font:10px system-ui;color:#777d91;letter-spacing:.5px;margin-top:5px}
+</style>
 </head>
 
 <body>
@@ -1843,13 +1846,38 @@ body.vn-hover .vn-cursor{width:42px;height:42px;border-color:var(--pink);}
 <div id="toast"></div>
 
 <script>
+(function(){
+  var app=document.getElementById("app");
+  if(!app) return;
+  app.innerHTML=`<div class="vn-safe-boot"><div class="vn-safe-v">V</div><div class="vn-safe-brand">VENZNOVA</div><div class="vn-safe-sub">NIFT / CONNECT</div><div class="vn-safe-bar"><i></i></div></div>`;
+  window.addEventListener("error",function(){
+    if(app && !app.querySelector(".topbar")){
+      app.innerHTML=`<div class="vn-safe-boot"><div class="vn-safe-v">V</div><div class="vn-safe-brand">VENZNOVA</div><div class="vn-safe-sub">NIFT / CONNECT</div><div class="vn-safe-bar"><i></i></div><small>Preparing your creative space…</small></div>`;
+    }
+  });
+})();
+</script>
+
+<script>
 
 /* =========================================================
    STATE
 ========================================================= */
 
+const safeStorage = {
+  get(key){
+    try{return window.localStorage.getItem(key) || "";}catch(e){return "";}
+  },
+  set(key,value){
+    try{window.localStorage.setItem(key,value);}catch(e){}
+  },
+  remove(key){
+    try{window.localStorage.removeItem(key);}catch(e){}
+  }
+};
+
 const state = {
-  token: localStorage.getItem("vn_token") || "",
+  token: safeStorage.get("vn_token"),
   user: null,
   route: "home",
 
@@ -1923,7 +1951,7 @@ function toast(message, ok = true){
 
 const api = async(path,opt={}) => {
 
-  const token = state.token || localStorage.getItem("vn_token") || "";
+  const token = state.token || safeStorage.get("vn_token");
   const headers = {...(opt.headers || {})};
   if(token) headers.Authorization = "Bearer " + token;
 
@@ -1945,7 +1973,7 @@ const api = async(path,opt={}) => {
     if(response.status===401){
       state.token="";
       state.user=null;
-      localStorage.removeItem("vn_token");
+      safeStorage.remove("vn_token");
       throw new Error(data.error || "Login required.");
     }
 
@@ -2761,7 +2789,7 @@ window.addEventListener(
         })
         .catch(() => {
           state.token = "";
-          localStorage.removeItem("vn_token");
+          safeStorage.remove("vn_token");
           state.user = null;
           render();
         });
@@ -3333,10 +3361,7 @@ async function submitSignup(event){
     state.user =
       result.user;
 
-    localStorage.setItem(
-      "vn_token",
-      state.token
-    );
+    safeStorage.set("vn_token", state.token);
 
     closeModal();
 
@@ -3393,10 +3418,7 @@ async function submitLogin(event){
     state.user =
       result.user;
 
-    localStorage.setItem(
-      "vn_token",
-      state.token
-    );
+    safeStorage.set("vn_token", state.token);
 
     closeModal();
 
